@@ -11,7 +11,7 @@ function pintarVeredicto(v) {
     <h2>Veredicto</h2>
     <div class="veredicto ${r.clase}">
       <div class="k">¿Es rentable?</div>
-      <div class="grande">${r.titulo}</div>
+      <div class="grande" aria-live="polite">${r.titulo}</div>
       <ul>${r.lineas.map((l) => `<li>${l}</li>`).join('')}</ul>
       <div class="avisos-linea">
         ⚠ ${v.resumenAvisos.avisos} aviso(s) · 🔴 ${v.resumenAvisos.errores} error(es)
@@ -91,9 +91,17 @@ function pintarProyeccion(v) {
 }
 
 export function pintar(vista) {
+  // guardar el input de precio con foco para restaurarlo tras el re-render (no perder el cursor al tipear)
+  const act = document.activeElement;
+  const focoId = act && act.dataset && act.classList && act.classList.contains('precio-input')
+    ? act.dataset.n : null;
   pintarVeredicto(vista);
   pintarCombos(vista);
   pintarDesglose(vista);
   pintarEquilibrio(vista);
   pintarProyeccion(vista);
+  if (focoId) {
+    const nuevo = document.querySelector(`.precio-input[data-n="${focoId}"]`);
+    if (nuevo) { nuevo.focus(); nuevo.setSelectionRange(nuevo.value.length, nuevo.value.length); }
+  }
 }

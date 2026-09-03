@@ -3,9 +3,32 @@ import { analizarDesdeFormulario, escenariosDesdeFormulario } from './adapter.js
 import { pintar, alEditarPrecioCombo } from './render.js';
 import { montarEscenarios } from './graficos.js';
 
+const rail = document.getElementById('rail');
 const railForm = document.getElementById('rail-form');
 const bloqueEsc = document.getElementById('bloque-escenarios');
 let formulario;
+
+// responsive lite: bajo 900px el formulario del rail se puede colapsar
+const mqAngosto = matchMedia('(max-width:900px)');
+const railToggle = document.createElement('button');
+railToggle.type = 'button';
+railToggle.className = 'rail-toggle';
+railToggle.setAttribute('aria-controls', 'rail-form');
+function pintarRailToggle() {
+  const colapsado = rail.classList.contains('rail--colapsado');
+  railToggle.textContent = colapsado ? 'Mostrar entradas ▾' : 'Ocultar entradas ▴';
+  railToggle.setAttribute('aria-expanded', String(!colapsado));
+}
+railToggle.addEventListener('click', () => {
+  rail.classList.toggle('rail--colapsado');
+  pintarRailToggle();
+});
+rail.insertBefore(railToggle, railForm);
+pintarRailToggle();
+// al volver a pantalla ancha, asegurar que el formulario quede visible
+mqAngosto.addEventListener('change', (e) => {
+  if (!e.matches) { rail.classList.remove('rail--colapsado'); pintarRailToggle(); }
+});
 
 function debounce(fn, ms) {
   let t;
