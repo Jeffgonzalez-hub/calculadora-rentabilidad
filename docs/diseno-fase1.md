@@ -56,11 +56,17 @@ de entrada → objeto `Resultado`.
 ```
 import { analizar } from './src/index.js';
 const resultado = analizar(entrada);
+const conEscenarios = analizar(entrada, { conEscenarios: true });
 ```
 
 `analizar` es **pura y total**: nunca lanza por datos del usuario (un input inválido produce un
 aviso en `resultado.avisos`, no una excepción), no lee entorno, no toca disco ni red. Todo el
 cálculo ocurre en la llamada; la UI futura solo pinta `Resultado`.
+
+Por defecto **no calcula los escenarios** (`resultado.escenarios === null`): son ~90 llamadas
+internas a `analizar` y la ruta cara solo hace falta en un panel de «¿qué pasa si?». Se piden
+con `analizar(entrada, { conEscenarios: true })`. Un frontend que llama `analizar` en cada
+tecla debe quedarse con el default.
 
 ### Módulos
 
@@ -140,7 +146,10 @@ en cada llamada y los tests arman un `ctx` una vez.
   avisos: [ { codigo, nivel: 'error' | 'aviso', mensaje } ],
   combos: [
     {
-      n, ingreso, sugerido,   // sugerido:bool — si el precio lo puso el motor
+      n, ingreso,
+      precioSugerido,         // el precio que sugiere el motor para ese n — SIEMPRE presente,
+                              //   también cuando `ingreso` viene de la escalera (para comparar / Fase 3)
+      esSugerido,             // bool — true si `ingreso` lo puso el motor (no había escalera ni precioBase)
       costo:    { cogs, fleteIda, comisionRecaudo, empaque, colchonDevoluciones, total },   // por venta entregada
       utilidad: { porPedidoGenerado, porVentaEntregada, final },
       margen:   { bruto, neto },
@@ -157,7 +166,7 @@ en cada llamada y los tests arman un `ctx` una vez.
     tasaEntregaMinima, tasaCierreMinima, costoConversacionMaximo, roasMinimo, unidadesDiaParaFijos,
   },
   proyeccion: { pedidosDia, ventasEntregadasDia, utilidadDia, utilidadMes },   // ya con fijos restados
-  escenarios: {
+  escenarios: {   // null salvo que se llame con { conEscenarios: true }
     sensibilidad: { [variable]: [ { delta, utilidadFinal, margenNeto, utilidadMes, cruzaCero } ] },
     tornado: [ { variable, impactoAbajo, impactoArriba } ],
     matrizEntregaCierre: { ejes, celdas },
@@ -249,9 +258,11 @@ y `n = 1`, esto es exactamente `C + fleteIda + colchon + utilidadObjetivo`, la f
 
 En modo `sugerir` con `escaleraPrecios` no vacía, el motor **evalúa esa escalera tal cual** (no
 la pisa) y además reporta `precioSugerido(n)` para comparar; el `ingreso` del combo es el de la
-escalera si hay fila para ese `n`, si no el sugerido. En modo `evaluar` sin `escaleraPrecios`,
-los combos 2/3 se calculan como `precioBase * n` (sin descuento) y se marca aviso
-`combo_sin_precio`.
+escalera si hay fila para ese `n`, si no el sugerido. `combo.precioSugerido` se calcula
+**siempre** (en todos los combos, cualquier modo) — es el número que Fase 3 usa para el botón
+«escribir precio sugerido al catálogo». `combo.esSugerido` es el booleano «¿el `ingreso` lo puso
+el motor?». En modo `evaluar` sin `escaleraPrecios`, los combos 2/3 se calculan como
+`precioBase * n` (sin descuento) y se marca aviso `combo_sin_precio`.
 
 ### Puntos de equilibrio (todos en forma cerrada)
 
@@ -316,7 +327,14 @@ sensibilidadUnaVariable(entrada, variable)
        recalcula analizar() con esa variable escalada por (1 + delta)
        devuelve [{ delta, utilidadFinal, margenNeto, utilidadMes, cruzaCero }]
        (cruzaCero marca el primer paso donde utilidadFinal cambia de signo)
-  Para 'precio' y 'costoPedidoFallido' se escalan todos los combos / componentes proporcionalmente.
+  Para 'costoPedidoFallido' se escalan **solo** los términos que dependen de que el pedido rebote
+       (`fleteDevolucion`, `feeDevolucion`, `pctProductoPerdidoEnDevolucion`) — NO `fleteIda`,
+       que se paga también en el pedido entregado.
+  Para 'precio' se perturba el **precio realizado** (±X% real): en modo `evaluar` se escala
+       `precioBase` y la escalera; en modo `sugerir` se corre `analizar` una vez, se toma el
+       precio sugerido de 1u y se re-corre en modo `evaluar` con ese precio ×factor — así la
+       fila `precio` del tornado es comparable con las demás (±10 % real, no ±10 % de la
+       utilidad objetivo, que movía el precio solo ~3,8 %).
 
 tornado(entrada)
   -> para cada variable de arriba: impacto en utilidadFinal (combo n=1) de un +-10 %
@@ -342,11 +360,11 @@ Devuelve `[{ codigo, nivel, mensaje }]`. `nivel: 'error'` marca los resultados c
 | `precio_bajo_costo` | error | algún `ingreso` < `cogs(n) + fleteIda` |
 | `entrega_en_piso` | aviso | `tasaEntrega` tocó el clamp inferior (0.01) |
 | `cierre_en_piso` | aviso | `tasaCierre` tocó el clamp inferior |
-| `devolucion_sin_costo` | aviso | `costoPedidoFallido(1)` == 0 (COD sin riesgo modelado) |
+| `devolucion_sin_costo` | aviso | `fleteDevolucion + feeDevolucion + pctProductoPerdidoEnDevolucion·costoUnitario` == 0 (COD sin riesgo de devolución modelado; **no** mira `fleteIda`, que casi siempre está y tapaba el aviso) |
 | `mezcla_renormalizada` | aviso | `mezcla` no sumaba 1 |
 | `combo_sin_precio` | aviso | modo `evaluar`, combo 2/3 sin fila en `escaleraPrecios` |
 | `escalera_incoherente` | aviso | un combo mayor cuesta por unidad más que uno menor |
-| `equilibrio_inalcanzable` | aviso | algún punto de equilibrio salió fuera de rango |
+| `equilibrio_inalcanzable` | aviso | **cualquiera** de los 6 puntos salió `null`: `precioMinimo[].valor`, `roasMinimo` o `unidadesDiaParaFijos` nulos; o —solo si hay pauta— `tasaEntregaMinima` / `tasaCierreMinima` / `costoConversacionMaximo` nulos. Sin pauta `precioMinimo` es `null` por diseño, así que este aviso acompaña a `sin_pauta` |
 | `sin_pauta` | aviso | `costoConversacion` <= 0 |
 
 ## Redondeo (`redondeo.redondear`)
@@ -419,7 +437,27 @@ sugerido final.
   despejar. Si un supuesto futuro (flete por tramos de peso) rompe la linealidad, se añade
   bisección en `equilibrio.js` sin cambiar la interfaz.
 - El **snapshot** de `bordes.test.js` se regenera a propósito cuando una fórmula cambie — es su
-  función, no un estorbo.
+  función, no un estorbo. `test/_generar-snapshot.mjs` corre solo dentro de `npm test` (Node
+  ejecuta todo archivo bajo `test/`), así que el fixture se reescribe en cada `npm test`; para
+  regenerarlo aislado: `node test/_generar-snapshot.mjs`.
+
+### Desviaciones del spec ya en el código (sanas; se anotan porque Fase 2/3 leen esto como contrato)
+
+- `elegirMejorCombo` vive en `index.js`, no en `combos.js`. En la rama sin pauta (fallback a
+  `porVentaEntregada`) el `criterio` que devuelve lo dice: `'mayor utilidad por venta entregada
+  (sin descontar pauta)'`.
+- La validación es `revisar(ctx, combos)` — recibe el `ctx` normalizado y los combos ya armados,
+  no `revisar(entradaNormalizada)`.
+- `evaluarCombo(n)` (un solo argumento); el precio a evaluar sale del `ctx`/escalera, no se pasa.
+- `costoTotalPorVenta(n, precio, cac)` es de 3 argumentos (el `cac` entra explícito), no de 2.
+- **Política de `null` en equilibrio** (simétrica): `tasaEntregaMinima` y `tasaCierreMinima` ya
+  **no** cortan por «no hay pauta». Con `cc = 0` el término `(cc+ca)/k` se anula; `tasaEntregaMinima`
+  queda `CPF/(bruto+CPF)` (válido) y `tasaCierreMinima` se auto-nulea vía su range-check si además
+  `ca = 0`. `precioMinimo` sí sigue `null` sin pauta (usa el CAC).
+- **Proyección con `presupuestoDia = 0` pero `costoConversacion > 0`**: no devuelve todo `null`;
+  como no hay ventas, `utilidadDia = -(costosFijosMes / diasOperacionMes)` (y el mes proporcional),
+  `pedidosDia`/`ventasEntregadasDia` en 0. El todo-`null` queda solo para `costoConversacion <= 0`
+  (ahí no se puede ni calcular CAC).
 
 ## Fases siguientes (fuera de este spec, para contexto)
 

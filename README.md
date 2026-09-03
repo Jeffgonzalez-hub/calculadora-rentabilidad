@@ -36,8 +36,15 @@ const resultado = analizar({
   mercado:   { tasaEntrega: 0.75, tasaCierre: 0.20, costoConversacion: 4000 },
   objetivo:  { modo: 'sugerir', utilidadObjetivo: 40000 },
 });
-// resultado.combos, resultado.equilibrio, resultado.escenarios, resultado.avisos
+// resultado.combos, resultado.equilibrio, resultado.avisos
+
+// Los escenarios «¿qué pasa si?» NO se calculan por defecto (resultado.escenarios === null):
+// son ~90 llamadas internas a analizar(). Se piden explícitamente:
+const conEscenarios = analizar(entrada, { conEscenarios: true }); // .escenarios poblado
 ```
+
+Un frontend que llama `analizar` en cada tecla debe usar el default (sin escenarios) y pedir
+`{ conEscenarios: true }` solo cuando pinte el panel de escenarios.
 
 ## Principios
 

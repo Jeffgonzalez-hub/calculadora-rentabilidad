@@ -43,12 +43,19 @@
       "utilidadObjetivo": 40000
     }
   },
-  "avisos": [],
+  "avisos": [
+    {
+      "codigo": "devolucion_sin_costo",
+      "nivel": "aviso",
+      "mensaje": "No se modeló ningún costo de devolución; la contraentrega parece sin riesgo."
+    }
+  ],
   "combos": [
     {
       "n": 1,
       "ingreso": 105100,
-      "sugerido": true,
+      "precioSugerido": 105100,
+      "esSugerido": true,
       "costo": {
         "cogs": 37500,
         "fleteIda": 20000,
@@ -84,7 +91,8 @@
     {
       "n": 2,
       "ingreso": 174100,
-      "sugerido": true,
+      "precioSugerido": 174100,
+      "esSugerido": true,
       "costo": {
         "cogs": 75000,
         "fleteIda": 20000,
@@ -120,7 +128,8 @@
     {
       "n": 3,
       "ingreso": 244100,
-      "sugerido": true,
+      "precioSugerido": 244100,
+      "esSugerido": true,
       "costo": {
         "cogs": 112500,
         "fleteIda": 20000,
