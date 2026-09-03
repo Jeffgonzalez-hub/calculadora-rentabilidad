@@ -325,3 +325,114 @@ export function resultadoToVista(resultado, modo, comboSeleccionado = 1) {
     escenarios: null,
   };
 }
+
+// --- Escenarios: resultado.escenarios → vista.escenarios ---
+
+const LABELS_VAR = {
+  costoConversacion: 'Costo por conversación',
+  tasaEntrega: 'Tasa de entrega',
+  costoPedidoFallido: 'Costo de devolución',
+  precio: 'Precio',
+  tasaCierre: 'Tasa de cierre',
+};
+const signo = (n) => (n > 0 ? 1 : n < 0 ? -1 : 0);
+const pesosConSigno = (n) => (n < 0 ? '−' : '+') + pesos(Math.abs(n));
+
+function vistaSensibilidad(sens) {
+  const variables = Object.entries(sens).map(([clave, pasos]) => {
+    const vals = pasos.map((p) => p.utilidadFinal);
+    let min = Math.min(...vals), max = Math.max(...vals);
+    if (!(max > min)) { max = min + 1; }
+    const margen = (max - min) * 0.08;
+    min -= margen; max += margen;
+    const norm = (v) => ((v - min) / (max - min)) * 100;
+    const puntos = pasos.map((p, i) => ({
+      xPct: i * 10,
+      yPct: clamp(100 - norm(p.utilidadFinal), 0, 100),
+      valor: pesos(p.utilidadFinal),
+      valorRaw: p.utilidadFinal,
+      delta: (p.delta > 0 ? '+' : '') + pct(p.delta, 0),
+    }));
+    let cruceXPct = null;
+    for (let i = 1; i < puntos.length; i++) {
+      const a = puntos[i - 1].valorRaw, b = puntos[i].valorRaw;
+      if (a == null || b == null || a === 0) continue;
+      if (signo(a) !== signo(b)) {
+        const t = a / (a - b); // 0..1 entre i-1 e i
+        cruceXPct = clamp((i - 1) * 10 + t * 10, 0, 100);
+        break;
+      }
+    }
+    return {
+      clave, label: LABELS_VAR[clave] || clave,
+      puntos: puntos.map(({ valorRaw, ...p }) => p),
+      cruceXPct,
+      ejeY: { ceroPct: clamp(100 - norm(0), 0, 100), max: pesosCompacto(max), min: pesosCompacto(min) },
+    };
+  });
+  return { variables };
+}
+
+function vistaTornado(filas) {
+  const maxMag = Math.max(1, ...filas.map((f) => Math.max(Math.abs(f.impactoAbajo ?? 0), Math.abs(f.impactoArriba ?? 0))));
+  return filas.map((f) => ({
+    clave: f.variable,
+    label: LABELS_VAR[f.variable] || f.variable,
+    abajoPct: clamp((Math.abs(f.impactoAbajo ?? 0) / maxMag) * 100, 0, 100),
+    arribaPct: clamp((Math.abs(f.impactoArriba ?? 0) / maxMag) * 100, 0, 100),
+    abajo: f.impactoAbajo == null ? '—' : pesosConSigno(f.impactoAbajo),
+    arriba: f.impactoArriba == null ? '—' : pesosConSigno(f.impactoArriba),
+    dirAbajo: (f.impactoAbajo ?? 0) < 0 ? 'neg' : 'pos',
+    dirArriba: (f.impactoArriba ?? 0) < 0 ? 'neg' : 'pos',
+  }));
+}
+
+function vistaMatriz(mx) {
+  const todos = mx.celdas.flat().map((c) => c.utilidadMes ?? 0);
+  const esc = Math.max(1, ...todos.map((v) => Math.abs(v)));
+  const clase = (v) => {
+    const r = v / esc;
+    if (r <= -0.5) return 'mx-n2';
+    if (r < -0.05) return 'mx-n1';
+    if (r <= 0.05) return 'mx-0';
+    if (r < 0.5) return 'mx-p1';
+    return 'mx-p2';
+  };
+  let actual = { fila: 0, col: 0 };
+  const celdas = mx.celdas.map((fila, i) => fila.map((c, j) => {
+    if (c.actual) actual = { fila: i, col: j };
+    return { valor: pesosCompacto(c.utilidadMes), clase: clase(c.utilidadMes ?? 0), actual: !!c.actual };
+  }));
+  return {
+    ejeEntrega: mx.ejes.entrega.map((x) => pct(x)),
+    ejeCierre: mx.ejes.cierre.map((x) => pct(x)),
+    celdas, actual,
+  };
+}
+
+function vistaEscenarios(esc) {
+  if (!esc) return null;
+  return {
+    sensibilidad: vistaSensibilidad(esc.sensibilidad),
+    tornado: vistaTornado(esc.tornado),
+    matriz: vistaMatriz(esc.matrizEntregaCierre),
+  };
+}
+
+// --- Funciones públicas ---
+
+export function analizarDesdeFormulario(form) {
+  const entrada = formToEntrada(form);
+  const resultado = analizar(entrada, { conEscenarios: false });
+  return {
+    vista: resultadoToVista(resultado, entrada.objetivo.modo),
+    entradaNormalizada: resultado.entradaNormalizada,
+    avisos: resultado.avisos,
+  };
+}
+
+export function escenariosDesdeFormulario(form) {
+  const entrada = formToEntrada(form);
+  const resultado = analizar(entrada, { conEscenarios: true });
+  return vistaEscenarios(resultado.escenarios);
+}
