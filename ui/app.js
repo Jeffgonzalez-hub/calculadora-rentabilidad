@@ -1,6 +1,15 @@
-// Orquestador de la UI. Se completa en Tasks 6–9.
+import { montarFormulario } from './formulario.js';
 import { analizarDesdeFormulario } from './adapter.js';
 
-console.info('UI cargada. adapter OK:', typeof analizarDesdeFormulario === 'function');
-document.getElementById('bloque-veredicto').innerHTML =
-  '<h2>Veredicto</h2><div class="card">Cargá los datos en el panel izquierdo…</div>';
+const railForm = document.getElementById('rail-form');
+
+let formulario;
+function recalcular() {
+  const { vista } = analizarDesdeFormulario(formulario.leerForm());
+  // Task 7 pinta la vista. Por ahora, prueba de humo:
+  document.getElementById('bloque-veredicto').innerHTML =
+    `<h2>Veredicto</h2><div class="card">${vista.veredicto.titulo} — ${vista.veredicto.lineas[0]}</div>`;
+}
+
+formulario = montarFormulario(railForm, { alCambiar: recalcular });
+recalcular();
