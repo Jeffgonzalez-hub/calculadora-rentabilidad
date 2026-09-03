@@ -12,28 +12,57 @@ function escalar(entrada, variable, factor) {
   else if (variable === 'tasaEntrega') e.mercado.tasaEntrega = (e.mercado.tasaEntrega ?? 0.75) * factor;
   else if (variable === 'tasaCierre') e.mercado.tasaCierre = (e.mercado.tasaCierre ?? 0.20) * factor;
   else if (variable === 'costoPedidoFallido') {
-    for (const k of ['fleteIda', 'fleteDevolucion', 'feeDevolucion', 'pctProductoPerdidoEnDevolucion']) {
+    // Solo los términos que dependen de que el pedido rebote. fleteIda NO: se paga
+    // también en el pedido entregado, incluirlo contaminaría este lever.
+    for (const k of ['fleteDevolucion', 'feeDevolucion', 'pctProductoPerdidoEnDevolucion']) {
       if (e.supuestos[k] != null) e.supuestos[k] *= factor;
     }
-  } else if (variable === 'precio') {
-    // "subir/bajar el precio": en modo evaluar mueve precioBase y la escalera;
-    // en modo sugerir mueve la utilidad objetivo (proxy razonable).
+  }
+  // 'precio' NO se maneja aquí: usa entradaConPrecioEscalado(), que perturba el
+  // precio REALIZADO (±X% real), también en modo sugerir.
+  return e;
+}
+
+/**
+ * Entrada con el precio realizado escalado por `factor`, siempre resuelta en modo `evaluar`.
+ * En modo `evaluar` escala `precioBase` y la escalera (ya es un ±X% real).
+ * En modo `sugerir` corre `analizar` una vez para obtener el precio sugerido de 1u y lo
+ * fija como `precioBase` (×factor) en modo `evaluar` — así la fila `precio` del tornado /
+ * sensibilidad mueve el precio un ±X% real, comparable con las demás variables.
+ */
+export function entradaConPrecioEscalado(entrada, factor, analizar) {
+  const e = structuredClone(entrada);
+  e.producto = e.producto ?? {};
+  e.objetivo = e.objetivo ?? {};
+  const modo = e.objetivo.modo ?? (e.producto.precioBase == null ? 'sugerir' : 'evaluar');
+
+  if (modo === 'evaluar') {
     if (e.producto.precioBase != null) e.producto.precioBase *= factor;
     if (Array.isArray(e.producto.escaleraPrecios)) {
       e.producto.escaleraPrecios = e.producto.escaleraPrecios.map((f) => ({ ...f, precio: f.precio * factor }));
     }
-    if ((e.objetivo.modo ?? 'sugerir') === 'sugerir' && e.objetivo.utilidadObjetivo != null) {
-      e.objetivo.utilidadObjetivo *= factor;
-    }
+    return e;
   }
+
+  const ingreso1 = analizar(entrada).combos[0].ingreso;
+  e.producto.precioBase = ingreso1 * factor;
+  e.producto.escaleraPrecios = [];
+  e.objetivo = { modo: 'evaluar' };
   return e;
+}
+
+/** Entrada perturbada para `variable` por `factor`, con `precio` como caso especial. */
+function perturbar(entrada, variable, factor, analizar) {
+  return variable === 'precio'
+    ? entradaConPrecioEscalado(entrada, factor, analizar)
+    : escalar(entrada, variable, factor);
 }
 
 export function sensibilidadUnaVariable(entrada, variable, analizar) {
   const pasos = [];
   for (let i = -5; i <= 5; i++) {
     const delta = i / 10;
-    const r = analizar(escalar(entrada, variable, 1 + delta));
+    const r = analizar(perturbar(entrada, variable, 1 + delta, analizar));
     const c = r.combos[0];
     pasos.push({
       delta,
@@ -57,8 +86,8 @@ export function sensibilidadUnaVariable(entrada, variable, analizar) {
 export function tornado(entrada, analizar) {
   const base = analizar(entrada).combos[0].utilidad.final;
   const filas = VARIABLES.map((variable) => {
-    const abajo = analizar(escalar(entrada, variable, 0.9)).combos[0].utilidad.final;
-    const arriba = analizar(escalar(entrada, variable, 1.1)).combos[0].utilidad.final;
+    const abajo = analizar(perturbar(entrada, variable, 0.9, analizar)).combos[0].utilidad.final;
+    const arriba = analizar(perturbar(entrada, variable, 1.1, analizar)).combos[0].utilidad.final;
     return {
       variable,
       impactoAbajo: abajo != null && base != null ? abajo - base : null,
