@@ -353,17 +353,18 @@ Devuelve `[{ codigo, nivel, mensaje }]`. `nivel: 'error'` marca los resultados c
 
 ```
 redondear(v, { granularidad, terminacion, direccion }):
-  base = v segun direccion:
-    'arriba'  -> Math.ceil(v / granularidad)  * granularidad
-    'cercano' -> Math.round(v / granularidad) * granularidad
-    'abajo'   -> Math.floor(v / granularidad) * granularidad
-  r = base - terminacion
-  return Math.max(0, r)
+  si v <= 0: return 0
+  'cercano' -> Math.max(0, Math.round(v/granularidad)*granularidad - terminacion)
+  'abajo'   -> Math.max(0, Math.floor(v/granularidad)*granularidad - terminacion)
+  'arriba'  -> base = Math.ceil(v/granularidad)*granularidad
+               si base - terminacion < v: base += granularidad   // no quedar bajo el objetivo
+               return base - terminacion
 ```
 
-Con `direccion: 'arriba'` el precio sugerido nunca queda por debajo del objetivo de utilidad
-(corrige el sesgo del HTML, que siempre restaba 100 tras redondear al cercano). Solo se aplica
-al precio sugerido final.
+Con `direccion: 'arriba'` el precio sugerido **nunca queda por debajo del valor crudo** — si al
+restar la terminación (p. ej. 900) el resultado caería por debajo, sube un escalón más. Corrige
+el sesgo del HTML, que redondeaba al cercano y siempre restaba 100. Solo se aplica al precio
+sugerido final.
 
 ## Tests (`test/*.test.js`, puros, sin base de datos)
 
