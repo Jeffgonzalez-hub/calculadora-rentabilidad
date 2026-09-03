@@ -1,8 +1,10 @@
 import { montarFormulario } from './formulario.js';
-import { analizarDesdeFormulario } from './adapter.js';
+import { analizarDesdeFormulario, escenariosDesdeFormulario } from './adapter.js';
 import { pintar, alEditarPrecioCombo } from './render.js';
+import { montarEscenarios } from './graficos.js';
 
 const railForm = document.getElementById('rail-form');
+const bloqueEsc = document.getElementById('bloque-escenarios');
 let formulario;
 
 function debounce(fn, ms) {
@@ -10,19 +12,34 @@ function debounce(fn, ms) {
   return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
 }
 
-function recalcular() {
+const esc = montarEscenarios(bloqueEsc);
+let escVisible = false;
+let escSucio = true;
+
+function recalcularPrincipal() {
   const { vista } = analizarDesdeFormulario(formulario.leerForm());
   pintar(vista);
+  escSucio = true;
+  if (escVisible) recalcularEscenariosDebounced();
 }
-const recalcularDebounced = debounce(recalcular, 120);
+function recalcularEscenarios() {
+  esc.pintar(escenariosDesdeFormulario(formulario.leerForm()));
+  escSucio = false;
+}
+const recalcularPrincipalDebounced = debounce(recalcularPrincipal, 120);
+const recalcularEscenariosDebounced = debounce(recalcularEscenarios, 250);
 
-formulario = montarFormulario(railForm, { alCambiar: recalcularDebounced });
+new IntersectionObserver((entradas) => {
+  escVisible = entradas[0].isIntersecting;
+  if (escVisible && escSucio) recalcularEscenarios();
+}, { threshold: 0.15 }).observe(bloqueEsc);
 
-// editar el precio de una tarjeta (modo evaluar) escribe en el input del rail y recalcula
+formulario = montarFormulario(railForm, { alCambiar: () => { recalcularPrincipalDebounced(); if (escVisible) esc.marcarDesactualizado(); } });
+
 alEditarPrecioCombo((n, valor) => {
   const id = n === 1 ? 'f-precioBase' : `f-precio${n}`;
-  const el = document.getElementById(id);
-  if (el) { el.value = valor; recalcularDebounced(); }
+  const elx = document.getElementById(id);
+  if (elx) { elx.value = valor; recalcularPrincipalDebounced(); }
 });
 
-recalcular();
+recalcularPrincipal();
