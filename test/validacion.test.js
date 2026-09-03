@@ -18,9 +18,15 @@ test('precio bajo costo es error', () => {
   assert.ok(tiene(revisar(ctx, combos), 'precio_bajo_costo'));
 });
 
-test('devolución sin costo modelado avisa', () => {
-  const ctx = ctxDe({ producto: { costoUnitario: 37500 }, supuestos: { fleteIda: 0 }, mercado: { costoConversacion: 4000 } });
+test('devolución sin costo modelado avisa aunque haya flete de ida', () => {
+  // flete de ida presente (lo normal) pero sin flete/fee de devolución ni pérdida de producto
+  const ctx = ctxDe({ producto: { costoUnitario: 37500 }, supuestos: { fleteIda: 20000 }, mercado: { costoConversacion: 4000 } });
   assert.ok(tiene(revisar(ctx, [{ n: 1, ingreso: 100000 }]), 'devolucion_sin_costo'));
+});
+
+test('con riesgo de devolución modelado NO avisa', () => {
+  const ctx = ctxDe({ producto: { costoUnitario: 37500 }, supuestos: { fleteIda: 20000, fleteDevolucion: 10000 }, mercado: { costoConversacion: 4000 } });
+  assert.ok(!tiene(revisar(ctx, [{ n: 1, ingreso: 100000 }]), 'devolucion_sin_costo'));
 });
 
 test('sin pauta avisa', () => {

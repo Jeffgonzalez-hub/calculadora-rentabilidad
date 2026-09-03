@@ -15,9 +15,11 @@ export function revisar(ctx, combos) {
     }
   }
 
-  const cpf1 = ctx.fleteIda + ctx.fleteDevolucion + ctx.feeDevolucion
+  // Solo los términos específicos de la devolución (NO fleteIda, que se paga siempre):
+  // un negocio con flete de ida pero sin flete/fee de devolución modelado igual tiene riesgo.
+  const riesgoDevolucion = ctx.fleteDevolucion + ctx.feeDevolucion
     + ctx.pctProductoPerdidoEnDevolucion * ctx.costoUnitario;
-  if (cpf1 === 0) {
+  if (riesgoDevolucion === 0) {
     avisos.push(aviso('devolucion_sin_costo', 'aviso', 'No se modeló ningún costo de devolución; la contraentrega parece sin riesgo.'));
   }
 

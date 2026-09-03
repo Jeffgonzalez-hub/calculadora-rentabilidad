@@ -1,7 +1,7 @@
 /** Rentabilidad por combo. Factory sobre ctx + costos + publicidad. */
 export function crearRentabilidad(ctx, costos, publicidad) {
   const { fleteIda, empaquePorPedido, tasaEntrega: t } = ctx;
-  const { cogs, costoPedidoFallido, colchonDevoluciones, comisionRecaudo } = costos;
+  const { cogs, costoPedidoFallido, comisionRecaudo } = costos;
   const cac = publicidad.cac();
 
   const brutoPorPedido = (n, precio) =>
@@ -18,6 +18,7 @@ export function crearRentabilidad(ctx, costos, publicidad) {
 
   const margen = (n, precio) => {
     if (!(precio > 0)) return { bruto: null, neto: null };
+    // margen.bruto excluye empaquePorPedido a propósito (spec); brutoPorPedido sí lo incluye.
     const brutoAntes = precio - cogs(n) - fleteIda - comisionRecaudo(precio);
     const final = utilidadFinal(n, precio);
     return { bruto: brutoAntes / precio, neto: final == null ? null : final / precio };

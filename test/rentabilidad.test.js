@@ -53,7 +53,6 @@ test('sin pauta: utilidadFinal y margen neto null, bruto sí calcula', () => {
 });
 
 test('costo unitario 0: markup null, no divide por cero', () => {
-  const r = motor({}); // C=37500... forzamos con override directo
   const { ctx } = normalizarEntrada({ producto: { costoUnitario: 0 }, supuestos: { fleteIda: 0 }, mercado: { costoConversacion: 4000 } });
   const r0 = crearRentabilidad(ctx, crearCostos(ctx), crearPublicidad(ctx));
   assert.equal(r0.markup(1, 50000).sobreProducto, null);
