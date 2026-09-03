@@ -1,0 +1,189 @@
+{
+  "entradaNormalizada": {
+    "producto": {
+      "costoUnitario": 37500,
+      "precioBase": null,
+      "escaleraPrecios": []
+    },
+    "supuestos": {
+      "fleteIda": 20000,
+      "fleteDevolucion": 0,
+      "feeDevolucion": 0,
+      "pctProductoPerdidoEnDevolucion": 0,
+      "comisionRecaudoPct": 0,
+      "comisionRecaudoFijo": 0,
+      "empaquePorPedido": 0,
+      "costoAtencionConversacion": 0,
+      "cesionUtilidadPorUnidadExtra": 0.2,
+      "redondeo": {
+        "granularidad": 1000,
+        "terminacion": 900,
+        "direccion": "arriba"
+      }
+    },
+    "mercado": {
+      "tasaEntrega": 0.75,
+      "tasaCierre": 0.2,
+      "costoConversacion": 4000
+    },
+    "publicidad": {
+      "presupuestoDia": 20000
+    },
+    "overhead": {
+      "costosFijosMes": 0,
+      "diasOperacionMes": 30
+    },
+    "mezcla": {
+      "1": 1,
+      "2": 0,
+      "3": 0
+    },
+    "objetivo": {
+      "modo": "sugerir",
+      "utilidadObjetivo": 40000
+    }
+  },
+  "avisos": [],
+  "combos": [
+    {
+      "n": 1,
+      "ingreso": 105100,
+      "sugerido": true,
+      "costo": {
+        "cogs": 37500,
+        "fleteIda": 20000,
+        "comisionRecaudo": 0,
+        "empaque": 0,
+        "colchonDevoluciones": 6666.67,
+        "total": 90833.33
+      },
+      "utilidad": {
+        "porPedidoGenerado": 30700,
+        "porVentaEntregada": 40933.33,
+        "final": 14266.67
+      },
+      "margen": {
+        "bruto": 0.45,
+        "neto": 0.14
+      },
+      "markup": {
+        "sobreProducto": 2.8,
+        "sobreProductoYFlete": 1.83
+      },
+      "cac": 26666.67,
+      "roas": {
+        "actual": 3.94,
+        "equilibrio": 2.57
+      },
+      "descuentoMaximoPct": 0.14,
+      "semaforo": {
+        "nivel": "apretado",
+        "pct": 13.57
+      }
+    },
+    {
+      "n": 2,
+      "ingreso": 174100,
+      "sugerido": true,
+      "costo": {
+        "cogs": 75000,
+        "fleteIda": 20000,
+        "comisionRecaudo": 0,
+        "empaque": 0,
+        "colchonDevoluciones": 6666.67,
+        "total": 128333.33
+      },
+      "utilidad": {
+        "porPedidoGenerado": 54325,
+        "porVentaEntregada": 72433.33,
+        "final": 45766.67
+      },
+      "margen": {
+        "bruto": 0.45,
+        "neto": 0.26
+      },
+      "markup": {
+        "sobreProducto": 2.32,
+        "sobreProductoYFlete": 1.83
+      },
+      "cac": 26666.67,
+      "roas": {
+        "actual": 6.53,
+        "equilibrio": 2.4
+      },
+      "descuentoMaximoPct": 0.26,
+      "semaforo": {
+        "nivel": "sano",
+        "pct": 26.29
+      }
+    },
+    {
+      "n": 3,
+      "ingreso": 244100,
+      "sugerido": true,
+      "costo": {
+        "cogs": 112500,
+        "fleteIda": 20000,
+        "comisionRecaudo": 0,
+        "empaque": 0,
+        "colchonDevoluciones": 6666.67,
+        "total": 165833.33
+      },
+      "utilidad": {
+        "porPedidoGenerado": 78700,
+        "porVentaEntregada": 104933.33,
+        "final": 78266.67
+      },
+      "margen": {
+        "bruto": 0.46,
+        "neto": 0.32
+      },
+      "markup": {
+        "sobreProducto": 2.17,
+        "sobreProductoYFlete": 1.84
+      },
+      "cac": 26666.67,
+      "roas": {
+        "actual": 9.15,
+        "equilibrio": 2.33
+      },
+      "descuentoMaximoPct": 0.32,
+      "semaforo": {
+        "nivel": "premium",
+        "pct": 32.06
+      }
+    }
+  ],
+  "mejorCombo": {
+    "n": 3,
+    "criterio": "mayor utilidad limpia por venta entregada"
+  },
+  "equilibrio": {
+    "precioMinimo": [
+      {
+        "n": 1,
+        "valor": 90833.33
+      },
+      {
+        "n": 2,
+        "valor": 128333.33
+      },
+      {
+        "n": 3,
+        "valor": 165833.33
+      }
+    ],
+    "tasaEntregaMinima": 0.59,
+    "tasaCierreMinima": 0.13,
+    "costoConversacionMaximo": 6140,
+    "roasMinimo": 2.57,
+    "unidadesDiaParaFijos": 0
+  },
+  "proyeccion": {
+    "pedidosDia": 1,
+    "ventasEntregadasDia": 0.75,
+    "utilidadDia": 10700,
+    "utilidadMes": 321000
+  },
+  "escenarios": null
+}
