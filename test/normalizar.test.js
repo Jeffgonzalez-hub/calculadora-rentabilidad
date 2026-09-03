@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizarEntrada, DEFAULTS } from '../src/normalizar.js';
+import { normalizarEntrada } from '../src/normalizar.js';
 
 test('aplica defaults cuando la entrada está casi vacía', () => {
   const { ctx } = normalizarEntrada({ producto: { costoUnitario: 37500 }, objetivo: { modo: 'sugerir', utilidadObjetivo: 40000 } });
@@ -48,4 +48,22 @@ test('clampa comisionRecaudoPct y pctProductoPerdido', () => {
 test('no lanza con entrada undefined', () => {
   assert.doesNotThrow(() => normalizarEntrada());
   assert.doesNotThrow(() => normalizarEntrada(null));
+});
+
+test('no lanza con valores adversarios (Symbol) en la entrada', () => {
+  assert.doesNotThrow(() => normalizarEntrada({
+    producto: { costoUnitario: Symbol('x') },
+    supuestos: { fleteIda: Symbol() },
+    mercado: { tasaEntrega: Symbol() },
+  }));
+});
+
+test('acota redondeo.terminacion a [0, granularidad - 1]', () => {
+  const { ctx } = normalizarEntrada({
+    producto: { costoUnitario: 1 },
+    supuestos: { redondeo: { terminacion: 5000, granularidad: 1000 } },
+  });
+  assert.equal(ctx.redondeo.granularidad, 1000);
+  assert.ok(ctx.redondeo.terminacion < ctx.redondeo.granularidad);
+  assert.equal(ctx.redondeo.terminacion, 999);
 });

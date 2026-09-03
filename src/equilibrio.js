@@ -9,7 +9,6 @@ export function crearEquilibrio(ctx, costos, rent, publicidad) {
     fleteIda, empaquePorPedido, costosFijosMes, diasOperacionMes,
   } = ctx;
   const cac = publicidad.cac();
-  const hayPauta = publicidad.disponible;
 
   const precioMinimo = (n) => {
     if (cac == null) return null;
@@ -24,7 +23,8 @@ export function crearEquilibrio(ctx, costos, rent, publicidad) {
   };
 
   const tasaEntregaMinima = (n, precio) => {
-    if (!hayPauta) return null;
+    // No depende de que haya pauta: con cc = 0 el término (cc+ca)/k se anula y
+    // queda CPF/(bruto+CPF), un valor válido. Solo los range-checks de abajo lo nulean.
     const CPF = costos.costoPedidoFallido(n);
     const bruto = rent.brutoPorPedido(n, precio); // no depende de t
     const den = bruto + CPF;
@@ -34,7 +34,8 @@ export function crearEquilibrio(ctx, costos, rent, publicidad) {
   };
 
   const tasaCierreMinima = (n, precio) => {
-    if (!hayPauta) return null;
+    // Sin pauta (cc = 0): si ca = 0 el numerador se anula y km = 0 => se auto-nulea
+    // vía el range-check; si ca > 0 el valor sigue siendo válido.
     const uPVE = rent.utilidadPorVentaEntregada(n, precio);
     if (!(uPVE > 0)) return null;
     const km = (cc + ca) / (t * uPVE);
@@ -56,6 +57,8 @@ export function crearEquilibrio(ctx, costos, rent, publicidad) {
     const fijoDia = costosFijosMes / diasOperacionMes;
     if (!(fijoDia > 0)) return 0;
     const uPond = combos.reduce((acc, c) => {
+      // sin pauta => CAC 0 => utilidadFinal es null y el denominador correcto ES
+      // porVentaEntregada (mismo valor), no un swap silencioso de denominador.
       const u = c.utilidad.final ?? c.utilidad.porVentaEntregada ?? 0;
       return acc + (mezcla[c.n] ?? 0) * u;
     }, 0);

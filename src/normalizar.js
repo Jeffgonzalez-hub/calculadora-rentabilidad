@@ -64,6 +64,10 @@ export function normalizarEntrada(entrada = {}) {
   const precioBase = prod.precioBase == null ? null : num(prod.precioBase, 0);
   const escaleraPrecios = normalizarEscalera(prod.escaleraPrecios);
 
+  // La granularidad se calcula antes que la terminación para poder acotar
+  // terminacion a [0, granularidad - 1] (una terminación >= granularidad daba precios raros).
+  const granRedondeo = Math.max(1, num(redondeo.granularidad, 1000));
+
   const modo = obj.modo === 'evaluar' || obj.modo === 'sugerir'
     ? obj.modo
     : (precioBase == null ? 'sugerir' : 'evaluar');
@@ -78,8 +82,8 @@ export function normalizarEntrada(entrada = {}) {
     costoAtencionConversacion: num(s.costoAtencionConversacion),
     cesionUtilidadPorUnidadExtra: clamp(num(s.cesionUtilidadPorUnidadExtra, 0.20), 0, 1),
     redondeo: {
-      granularidad: Math.max(1, num(redondeo.granularidad, 1000)),
-      terminacion: Math.max(0, num(redondeo.terminacion, 900)),
+      granularidad: granRedondeo,
+      terminacion: clamp(Math.max(0, num(redondeo.terminacion, 900)), 0, granRedondeo - 1),
       direccion: ['arriba', 'cercano', 'abajo'].includes(redondeo.direccion) ? redondeo.direccion : 'arriba',
     },
     tasaEntrega, tasaCierre,

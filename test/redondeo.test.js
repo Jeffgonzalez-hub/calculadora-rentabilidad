@@ -29,3 +29,13 @@ test('valor <= 0 devuelve 0', () => {
 test('terminación 0 = múltiplo puro hacia arriba', () => {
   assert.equal(redondear(104166.67, { granularidad: 1000, terminacion: 0, direccion: 'arriba' }), 105000);
 });
+
+test("'arriba' con terminacion >= granularidad: nunca negativo ni bajo el crudo", () => {
+  // redondeo.js debe clampar aunque el ctx normalizado ya no deje llegar aquí una
+  // terminacion >= granularidad — el helper es público y hay que blindarlo.
+  for (const v of [100, 3000, 5000, 104166.67, 1_500_000]) {
+    const r = redondear(v, { granularidad: 1000, terminacion: 5000, direccion: 'arriba' });
+    assert.ok(r >= 0, `negativo para v=${v}: ${r}`);
+    assert.ok(r >= v - 1e-9, `bajo el crudo para v=${v}: ${r} < ${v}`);
+  }
+});

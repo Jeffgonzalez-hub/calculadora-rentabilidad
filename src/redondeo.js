@@ -18,8 +18,9 @@ export function redondear(v, { granularidad, terminacion, direccion } = {}) {
   if (direccion === 'cercano') return Math.max(0, Math.round(val / g) * g - term);
   if (direccion === 'abajo') return Math.max(0, Math.floor(val / g) * g - term);
 
-  // 'arriba': asegura que el resultado no quede por debajo de val
+  // 'arriba': asegura que el resultado no quede por debajo de val y nunca sea negativo.
+  // `while` (no `if`) por si terminacion >= granularidad hace falta subir varios escalones.
   let base = Math.ceil(val / g) * g;
-  if (base - term < val) base += g;
-  return base - term;
+  while (base - term < val) base += g;
+  return Math.max(0, base - term);
 }

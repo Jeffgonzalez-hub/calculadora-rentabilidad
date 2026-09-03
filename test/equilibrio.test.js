@@ -36,7 +36,7 @@ test('descuentoMaximoPct: bajar el precio a precioMinimo deja utilidad 0', () =>
 });
 
 test('sustituir la tasa de entrega mínima deja utilidad final ~0', () => {
-  const { ctx, eq } = mod();
+  const { eq } = mod();
   const tmin = eq.tasaEntregaMinima(1, PRECIO);
   const { ctx: ctx2 } = normalizarEntrada({
     producto: { costoUnitario: 37500 }, supuestos: { fleteIda: 20000 },
@@ -71,10 +71,12 @@ test('sin fijos: unidadesDiaParaFijos es 0', () => {
   assert.equal(eq.unidadesDiaParaFijos([{ n: 1, utilidad: { final: rent.utilidadFinal(1, PRECIO) } }], { 1: 1 }), 0);
 });
 
-test('sin pauta: precioMinimo y tasas mínimas null', () => {
+test('sin pauta: precioMinimo null; tasaEntregaMinima ya no depende de la pauta', () => {
   const { eq } = mod({ mercado: { costoConversacion: 0 } });
-  assert.equal(eq.precioMinimo(1), null);
-  assert.equal(eq.tasaEntregaMinima(1, PRECIO), null);
+  assert.equal(eq.precioMinimo(1), null); // usa el CAC, que es null sin pauta
+  // con cc = 0 (y ca = 0) tasaEntregaMinima = CPF/(bruto+CPF), un valor válido
+  assert.ok(cerca(eq.tasaEntregaMinima(1, PRECIO), 0.3));
+  // con cc = ca = 0 el numerador de km se anula => se auto-nulea
   assert.equal(eq.tasaCierreMinima(1, PRECIO), null);
 });
 
