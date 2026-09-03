@@ -72,28 +72,29 @@ tecla debe quedarse con el default.
 
 ```
 src/
-  index.js         analizar() · normalizarEntrada() · DEFAULTS · (re-export de helpers para tests)
-  costos.js        cogs(n) · costoPedidoFallido(n) · colchonDevoluciones(n) · comisionRecaudo(precio) · costoTotalPorVenta(n, precio)
-  rentabilidad.js  brutoPorPedido(n, precio) · utilidadPorPedido(n, precio) · utilidadPorVentaEntregada(n, precio) · utilidadFinal(n, precio) · margen(n, precio) · markup(n, precio)
-  publicidad.js    cac() · pautaPorPedido() · pautaPorVenta() · roasActual(precio) · roasEquilibrio(n, precio)
-  combos.js        sugerirPrecioCombo(n) · evaluarCombo(n, precio) · elegirMejorCombo(combos, mezcla)
-  equilibrio.js    precioMinimo(n) · descuentoMaximoPct(n, precio) · tasaEntregaMinima(n, precio) · tasaCierreMinima(n, precio) · costoConversacionMaximo(n, precio) · roasMinimo(n, precio) · unidadesDiaParaFijos(combos, mezcla)
-  escenarios.js    sensibilidadUnaVariable(entrada, variable) · tornado(entrada) · matrizEntregaCierre(entrada)
+  index.js         analizar(entrada, {conEscenarios}) · normalizarEntrada() · DEFAULTS · elegirMejorCombo(combos) · calcularProyeccion(...)
+  normalizar.js    DEFAULTS · normalizarEntrada(entrada) → { ctx, entradaNormalizada, avisos }
+  util.js          num · clamp · aviso · pesos
+  costos.js        crearCostos(ctx) → { cogs(n), costoPedidoFallido(n), colchonDevoluciones(n), comisionRecaudo(precio), costoTotalPorVenta(n, precio, cac) }
+  rentabilidad.js  crearRentabilidad(ctx, costos, publicidad) → { brutoPorPedido, utilidadPorPedido, utilidadPorVentaEntregada, utilidadFinal, margen, markup, cac }
+  publicidad.js    crearPublicidad(ctx) → { disponible, cac(), pautaPorPedido(), pautaPorVenta(), roasActual(precio) }
+  combos.js        crearCombos(ctx, costos, rent) → { sugerirPrecioCombo(n), precioCrudo(n), evaluarCombo(n), semaforoDe(margenNeto) }
+  equilibrio.js    crearEquilibrio(ctx, costos, rent, publicidad) → { precioMinimo(n), descuentoMaximoPct(n, precio), tasaEntregaMinima(n, precio), tasaCierreMinima(n, precio), costoConversacionMaximo(n, precio), roasMinimo(n, precio), unidadesDiaParaFijos(combos, mezcla) }
+  escenarios.js    sensibilidadUnaVariable(entrada, variable, analizar) · tornado(entrada, analizar) · matrizEntregaCierre(entrada, analizar)
   redondeo.js      redondear(v, { granularidad, terminacion, direccion })
-  validacion.js    revisar(entradaNormalizada) → aviso[]
+  validacion.js    revisar(ctx, combos) → aviso[]
 test/
-  identidades.test.js · equilibrio.test.js · escenarios.test.js · bordes.test.js
-  fixtures/snapshot-defaults-html.json
+  un *.test.js por módulo + identidades.test.js · bordes.test.js
+  fixtures/snapshot-defaults-html.json · identidades.snapshot-util.mjs
+scripts/
+  generar-snapshot.mjs   (regenera el fixture; NO lo corre `node --test`)
 ```
 
 `index.js` es la única superficie pública. Los demás archivos exportan sus funciones para test
-unitario directo, pero reciben siempre un **contexto ya normalizado** (supuestos y mercado con
-defaults y clamps aplicados), no la `entrada` cruda.
-
-Convención de firmas: los helpers de `costos.js` / `rentabilidad.js` / `publicidad.js` /
-`equilibrio.js` se crean con una factory `crearMotor(ctx)` que cierra sobre el contexto
-normalizado y devuelve el conjunto de funciones. Así `utilidadFinal(n, precio)` no recibe `ctx`
-en cada llamada y los tests arman un `ctx` una vez.
+unitario directo. Las factories `crearCostos` / `crearRentabilidad` / `crearPublicidad` /
+`crearCombos` / `crearEquilibrio` reciben el **contexto ya normalizado** (`ctx`: supuestos y
+mercado con defaults y clamps aplicados) y cierran sobre él, así `utilidadFinal(n, precio)` no
+recibe `ctx` en cada llamada y los tests arman un `ctx` una vez con `normalizarEntrada(...).ctx`.
 
 ## Entrada
 
@@ -436,10 +437,11 @@ sugerido final.
 - **Forma cerrada vs. bisección** en equilibrio: forma cerrada porque hoy todo es lineal al
   despejar. Si un supuesto futuro (flete por tramos de peso) rompe la linealidad, se añade
   bisección en `equilibrio.js` sin cambiar la interfaz.
-- El **snapshot** de `bordes.test.js` se regenera a propósito cuando una fórmula cambie — es su
-  función, no un estorbo. `test/_generar-snapshot.mjs` corre solo dentro de `npm test` (Node
-  ejecuta todo archivo bajo `test/`), así que el fixture se reescribe en cada `npm test`; para
-  regenerarlo aislado: `node test/_generar-snapshot.mjs`.
+- El **snapshot** de `test/identidades.test.js` se regenera a propósito cuando una fórmula
+  cambie — es su función, no un estorbo. Regenerar: `npm run snapshot`
+  (`scripts/generar-snapshot.mjs`). Vive fuera de `test/` para que `node --test` no lo ejecute:
+  así el snapshot test compara contra el fixture commiteado y es un guard real, no
+  auto-satisfecho.
 
 ### Desviaciones del spec ya en el código (sanas; se anotan porque Fase 2/3 leen esto como contrato)
 

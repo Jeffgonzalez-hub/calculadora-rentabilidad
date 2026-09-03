@@ -13,6 +13,7 @@
     ".": "./src/index.js"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=1"
+    "test": "node --test --test-concurrency=1",
+    "snapshot": "node scripts/generar-snapshot.mjs"
   }
 }
