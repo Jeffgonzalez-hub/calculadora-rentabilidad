@@ -78,7 +78,10 @@ Reglas duras:
 
 ## El contrato — superficie entre `ui/app.js` y `ui/adapter.js`
 
-`ui/adapter.js` exporta exactamente esto:
+`ui/adapter.js` exporta **5** símbolos (superficie real para Fase 3):
+`CAMPOS`, `formToEntrada`, `resultadoToVista`, `analizarDesdeFormulario`,
+`escenariosDesdeFormulario`. `app.js` solo usa las dos últimas + `CAMPOS`; `formToEntrada` y
+`resultadoToVista` están exportados porque los tests puros del adapter los ejercen directo.
 
 ```js
 import { analizar, DEFAULTS } from '../src/index.js';
@@ -95,7 +98,8 @@ export const CAMPOS = [
 ];
 
 // Camino principal. app.js lo llama en cada cambio (con debounce).
-export function analizarDesdeFormulario(form) {
+// comboSeleccionado (1|2|3): combo del bloque 3 «De dónde sale el precio». Por defecto 1.
+export function analizarDesdeFormulario(form, comboSeleccionado = 1) {
   return {
     vista,                // ver «Forma de vista» — lo único que pinta app.js
     entradaNormalizada,   // passthrough del motor: para señalar valores clampados
@@ -111,17 +115,19 @@ export function escenariosDesdeFormulario(form) {
 }
 ```
 
-Internos del adapter (no exportados, testeados vía las dos funciones públicas):
+También exportados (los ejercen los tests puros del adapter; `app.js` no los usa):
 
 - `formToEntrada(form) → entrada` — parsea `"37.500"`/`"37500"`/`37500` → `37500`; campos `%` →
   fracción (`"75"` → `0.75`); toggle → `objetivo.modo`; combos vacíos en modo evaluar →
   `escaleraPrecios: []`; `mezcla1/2/3` → `{ 1, 2, 3 }`. Arma el objeto anidado
   `{ producto, supuestos, mercado, publicidad, overhead, mezcla, objetivo }`. Único que conoce
   ambos juegos de nombres.
-- `resultadoToVista(resultado, modo) → vista` — reagrupa en los 6 bloques, formatea (moneda/%/
-  ratio, `"—"` para `null`), precalcula las respuestas de primer nivel, y **escala todo lo
-  visual a 0–100** (anchos de barra, coordenadas de gráfico) para que el renderer no divida
-  nada.
+- `resultadoToVista(resultado, modo, comboSeleccionado = 1) → vista` — reagrupa en los 6
+  bloques, formatea (moneda/%/ratio, `"—"` para `null`), precalcula las respuestas de primer
+  nivel, y **escala todo lo visual a 0–100** (anchos de barra, coordenadas de gráfico) para que
+  el renderer no divida nada. Un paso/celda de escenarios con dato `null` (sin pauta) no produce
+  `"$0"`: la serie de sensibilidad queda `puntos: []` + `disponible: false`, y la celda de la
+  matriz `clase: 'mx-sin-dato'` + `valor: '—'`.
 - `formato.js`: `pesos(n)` → `"$105.100"` (es-CO), `pct(fr, dec=0)` → `"13 %"`, `ratio(n)` →
   `"2,8×"`, `oGuion(v, fmt)` → `fmt(v)` o `"—"` si `v == null`. Helpers puros; los usa el
   adapter, nunca el renderer.
@@ -506,3 +512,7 @@ Sin tests de DOM en esta fase (no hay runner de navegador sin deps). La verifica
   campo de `form`).
 - **Pages sirviendo la raíz**: expone `docs/`, `test/`, `src/`. Sin riesgo (estático, sin
   secretos); si molesta, un `dist/` con copia se añade en Fase 2.x.
+- **`escenariosDesdeFormulario` re-corre `analizar` entero** (bloques 1–5 incluidos, más las
+  ~130 pasadas de sensibilidad/tornado/matriz) — hoy da igual porque es un solo producto. En
+  Fase 3, si se itera un catálogo, conviene separar la pasada de escenarios (calcular bloques
+  1–5 una vez y los escenarios solo bajo demanda) en lugar de llamar esta función por fila.
