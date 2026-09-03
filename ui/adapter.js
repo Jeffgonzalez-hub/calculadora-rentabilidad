@@ -226,17 +226,26 @@ function vistaDesglose(r, comboN = 1) {
   const ing = c.ingreso;
   const claves = ['cogs', 'fleteIda', 'comisionRecaudo', 'empaque', 'colchonDevoluciones'];
   const base = claves.map((k) => c.costo[k]);
-  const utilidad = ing - base.reduce((a, b) => a + b, 0);
+  const sumaCostos = base.reduce((a, b) => a + b, 0);
+  const utilidad = ing - sumaCostos;
+  const perdida = utilidad < 0; // algún componente > precio (caso precio_bajo_costo)
   const montos = [...base, utilidad];
-  const partes = [...claves, 'utilidad'].map((k, i) => ({
-    clave: k,
-    label: LABEL_PARTE[k],
-    monto: pesos(montos[i]),
-    anchoPct: ing > 0 ? clamp((montos[i] / ing) * 100, 0, 100) : 0,
-    clase: 'part-' + (i + 1),
-  }));
+  const partes = [...claves, 'utilidad'].map((k, i) => {
+    let anchoPct;
+    if (k === 'utilidad') {
+      // en pérdida la utilidad es negativa: no ocupa barra.
+      anchoPct = perdida ? 0 : ing > 0 ? clamp((montos[i] / ing) * 100, 0, 100) : 0;
+    } else if (perdida) {
+      // reparto proporcional de las 5 partes de costo sobre su propia suma (≈100 %).
+      anchoPct = sumaCostos > 0 ? (montos[i] / sumaCostos) * 100 : 0;
+    } else {
+      anchoPct = ing > 0 ? clamp((montos[i] / ing) * 100, 0, 100) : 0;
+    }
+    return { clave: k, label: LABEL_PARTE[k], monto: pesos(montos[i]), anchoPct, clase: 'part-' + (i + 1) };
+  });
   return {
     comboN: c.n,
+    clase: perdida ? 'barra-perdida' : '',
     precio: pesos(ing),
     precioRaw: ing,
     partes,
@@ -256,9 +265,10 @@ function filaEquilibrio(clave, label, limite, actual, tipo, dir) {
   let holguraPct = 0;
   if (alcanzable && actual != null && limite > 0) {
     const rel = Math.abs(actual - limite) / limite;
-    holguraPct = clamp(rel * 100, 0, 100);
     const perdiendo = dir === 'min' ? actual < limite : actual > limite;
     clase = perdiendo ? 'eq-malo' : rel < 0.15 ? 'eq-ajustado' : 'eq-ok';
+    // una fila que ya cruzó al lado perdedor no tiene "holgura": barra en 0.
+    holguraPct = perdiendo ? 0 : clamp(rel * 100, 0, 100);
   }
   return {
     clave, label,
@@ -301,8 +311,9 @@ function vistaProyeccion(r) {
   }
   return {
     disponible: true,
-    pedidosDia: numero(p.pedidosDia),
-    ventasEntregadasDia: numero(p.ventasEntregadasDia),
+    // sub-1 por día: 2 decimales para no perder el "0,75" en un "0,8".
+    pedidosDia: numero(p.pedidosDia, 2),
+    ventasEntregadasDia: numero(p.ventasEntregadasDia, 2),
     utilidadDia: pesos(p.utilidadDia),
     utilidadDiaRaw: p.utilidadDia,
     utilidadMes: pesos(p.utilidadMes),
@@ -340,34 +351,52 @@ const pesosConSigno = (n) => (n < 0 ? '−' : '+') + pesos(Math.abs(n));
 
 function vistaSensibilidad(sens) {
   const variables = Object.entries(sens).map(([clave, pasos]) => {
-    const vals = pasos.map((p) => p.utilidadFinal);
+    const label = LABELS_VAR[clave] || clave;
+    // el motor devuelve null en cada paso cuando no hay datos de pauta.
+    const conDato = pasos.filter((p) => p.utilidadFinal != null);
+    if (conDato.length === 0) {
+      return {
+        clave, label, puntos: [], cruceXPct: null, disponible: false,
+        ejeY: { ceroPct: 50, max: '—', min: '—' },
+      };
+    }
+    const vals = conDato.map((p) => p.utilidadFinal);
     let min = Math.min(...vals), max = Math.max(...vals);
-    if (!(max > min)) { max = min + 1; }
+    const plana = !(max > min);
+    if (plana) { min -= 1; max += 1; } // serie plana ⇒ línea horizontal al medio
     const margen = (max - min) * 0.08;
     min -= margen; max += margen;
     const norm = (v) => ((v - min) / (max - min)) * 100;
-    const puntos = pasos.map((p, i) => ({
-      xPct: i * 10,
-      yPct: clamp(100 - norm(p.utilidadFinal), 0, 100),
-      valor: pesos(p.utilidadFinal),
-      valorRaw: p.utilidadFinal,
-      delta: (p.delta > 0 ? '+' : '') + pct(p.delta, 0),
-    }));
+    const puntos = [];
+    pasos.forEach((p, i) => {
+      if (p.utilidadFinal == null) return; // saltar huecos, no graficarlos
+      puntos.push({
+        xPct: i * 10,
+        yPct: plana ? 50 : clamp(100 - norm(p.utilidadFinal), 0, 100),
+        valor: oGuion(p.utilidadFinal, pesos),
+        valorRaw: p.utilidadFinal,
+        delta: (p.delta > 0 ? '+' : '') + pct(p.delta, 0),
+      });
+    });
     let cruceXPct = null;
     for (let i = 1; i < puntos.length; i++) {
       const a = puntos[i - 1].valorRaw, b = puntos[i].valorRaw;
       if (a == null || b == null || a === 0) continue;
       if (signo(a) !== signo(b)) {
-        const t = a / (a - b); // 0..1 entre i-1 e i
-        cruceXPct = clamp((i - 1) * 10 + t * 10, 0, 100);
+        const t = a / (a - b); // 0..1 entre los dos puntos
+        cruceXPct = clamp(puntos[i - 1].xPct + t * (puntos[i].xPct - puntos[i - 1].xPct), 0, 100);
         break;
       }
     }
     return {
-      clave, label: LABELS_VAR[clave] || clave,
+      clave, label,
       puntos: puntos.map(({ valorRaw, ...p }) => p),
       cruceXPct,
-      ejeY: { ceroPct: clamp(100 - norm(0), 0, 100), max: pesosCompacto(max), min: pesosCompacto(min) },
+      disponible: true,
+      ejeY: {
+        ceroPct: plana ? 50 : clamp(100 - norm(0), 0, 100),
+        max: pesosCompacto(max), min: pesosCompacto(min),
+      },
     };
   });
   return { variables };
@@ -375,11 +404,12 @@ function vistaSensibilidad(sens) {
 
 function vistaTornado(filas) {
   const maxMag = Math.max(1, ...filas.map((f) => Math.max(Math.abs(f.impactoAbajo ?? 0), Math.abs(f.impactoArriba ?? 0))));
+  // barras divergentes desde x=50: cada lado dispone de 50 unidades de ancho.
   return filas.map((f) => ({
     clave: f.variable,
     label: LABELS_VAR[f.variable] || f.variable,
-    abajoPct: clamp((Math.abs(f.impactoAbajo ?? 0) / maxMag) * 100, 0, 100),
-    arribaPct: clamp((Math.abs(f.impactoArriba ?? 0) / maxMag) * 100, 0, 100),
+    abajoPct: clamp((Math.abs(f.impactoAbajo ?? 0) / maxMag) * 50, 0, 50),
+    arribaPct: clamp((Math.abs(f.impactoArriba ?? 0) / maxMag) * 50, 0, 50),
     abajo: f.impactoAbajo == null ? '—' : pesosConSigno(f.impactoAbajo),
     arriba: f.impactoArriba == null ? '—' : pesosConSigno(f.impactoArriba),
     dirAbajo: (f.impactoAbajo ?? 0) < 0 ? 'neg' : 'pos',
@@ -388,8 +418,9 @@ function vistaTornado(filas) {
 }
 
 function vistaMatriz(mx) {
-  const todos = mx.celdas.flat().map((c) => c.utilidadMes ?? 0);
-  const esc = Math.max(1, ...todos.map((v) => Math.abs(v)));
+  // rampa divergente calculada solo con celdas que tienen dato.
+  const conDato = mx.celdas.flat().map((c) => c.utilidadMes).filter((v) => v != null);
+  const esc = Math.max(1, ...conDato.map((v) => Math.abs(v)));
   const clase = (v) => {
     const r = v / esc;
     if (r <= -0.5) return 'mx-n2';
@@ -401,7 +432,11 @@ function vistaMatriz(mx) {
   let actual = { fila: 0, col: 0 };
   const celdas = mx.celdas.map((fila, i) => fila.map((c, j) => {
     if (c.actual) actual = { fila: i, col: j };
-    return { valor: pesosCompacto(c.utilidadMes), clase: clase(c.utilidadMes ?? 0), actual: !!c.actual };
+    return {
+      valor: oGuion(c.utilidadMes, pesosCompacto),
+      clase: c.utilidadMes == null ? 'mx-sin-dato' : clase(c.utilidadMes),
+      actual: !!c.actual,
+    };
   }));
   return {
     ejeEntrega: mx.ejes.entrega.map((x) => pct(x)),
@@ -421,11 +456,11 @@ function vistaEscenarios(esc) {
 
 // --- Funciones públicas ---
 
-export function analizarDesdeFormulario(form) {
+export function analizarDesdeFormulario(form, comboSeleccionado = 1) {
   const entrada = formToEntrada(form);
   const resultado = analizar(entrada, { conEscenarios: false });
   return {
-    vista: resultadoToVista(resultado, entrada.objetivo.modo),
+    vista: resultadoToVista(resultado, entrada.objetivo.modo, comboSeleccionado),
     entradaNormalizada: resultado.entradaNormalizada,
     avisos: resultado.avisos,
   };

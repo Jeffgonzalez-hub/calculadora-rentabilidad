@@ -1,4 +1,8 @@
-/** Los 3 visuales de escenarios. Recibe coords 0–100; solo dibuja SVG. */
+/**
+ * Los 3 visuales de escenarios. Recibe coords ya en 0–100 desde la vista; solo dibuja SVG.
+ * Los SVG usan viewBox 0 0 100 100 + preserveAspectRatio="none": el renderer no escala nada,
+ * CSS estira cada SVG a su caja.
+ */
 const NS = 'http://www.w3.org/2000/svg';
 const el = (n, attrs = {}, txt) => {
   const e = document.createElementNS(NS, n);
@@ -6,40 +10,51 @@ const el = (n, attrs = {}, txt) => {
   if (txt != null) e.textContent = txt;
   return e;
 };
+// escape defensivo para texto que en Fase 3 podría venir del catálogo (nombres de producto).
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function svgSensibilidad(v) {
-  const s = el('svg', { viewBox: '0 0 100 60', class: 'g-sens' });
-  s.append(el('line', { x1: 0, y1: v.ejeY.ceroPct * 0.6, x2: 100, y2: v.ejeY.ceroPct * 0.6, stroke: 'var(--borde)', 'stroke-width': 0.5 }));
-  const pts = v.puntos.map((p) => `${p.xPct},${p.yPct * 0.6}`).join(' ');
+  const s = el('svg', { viewBox: '0 0 100 100', preserveAspectRatio: 'none', class: 'g-sens' });
+  if (v.disponible === false || !v.puntos.length) {
+    s.append(el('text', { x: 50, y: 50, 'font-size': 6, 'text-anchor': 'middle', fill: 'var(--tinta-suave)' }, 'sin datos'));
+    return s;
+  }
+  s.append(el('line', { x1: 0, y1: v.ejeY.ceroPct, x2: 100, y2: v.ejeY.ceroPct, stroke: 'var(--borde)', 'stroke-width': 0.5 }));
+  const pts = v.puntos.map((p) => `${p.xPct},${p.yPct}`).join(' ');
   s.append(el('polyline', { points: pts, fill: 'none', stroke: 'var(--acento)', 'stroke-width': 1.5 }));
   if (v.cruceXPct != null) {
-    s.append(el('circle', { cx: v.cruceXPct, cy: v.ejeY.ceroPct * 0.6, r: 1.8, fill: 'var(--mal)' }));
+    s.append(el('circle', { cx: v.cruceXPct, cy: v.ejeY.ceroPct, r: 1.8, fill: 'var(--mal)' }));
   }
   return s;
 }
 
 function svgTornado(filas) {
-  const h = filas.length * 16 + 6;
-  const s = el('svg', { viewBox: `0 0 100 ${h}`, class: 'g-tornado' });
-  s.append(el('line', { x1: 50, y1: 0, x2: 50, y2: h, stroke: 'var(--borde)', 'stroke-width': 0.5 }));
+  const s = el('svg', { viewBox: '0 0 100 100', preserveAspectRatio: 'none', class: 'g-tornado' });
+  s.append(el('line', { x1: 50, y1: 0, x2: 50, y2: 100, stroke: 'var(--borde)', 'stroke-width': 0.5 }));
+  const paso = 100 / Math.max(1, filas.length);
+  const hBarra = paso * 0.5;
   filas.forEach((f, i) => {
-    const y = i * 16 + 3;
+    const y = i * paso + (paso - hBarra) / 2;
+    const yTxt = y + hBarra * 0.8;
     const cAb = f.dirAbajo === 'neg' ? 'var(--mal)' : 'var(--ok)';
     const cAr = f.dirArriba === 'neg' ? 'var(--mal)' : 'var(--ok)';
-    s.append(el('rect', { x: 50 - f.abajoPct / 2, y, width: f.abajoPct / 2, height: 9, fill: cAb }));
-    s.append(el('rect', { x: 50, y, width: f.arribaPct / 2, height: 9, fill: cAr }));
-    s.append(el('text', { x: 1, y: y + 7, 'font-size': 5, fill: 'var(--tinta-suave)' }, f.label));
+    s.append(el('rect', { x: 50 - f.abajoPct, y, width: f.abajoPct, height: hBarra, fill: cAb }));
+    s.append(el('rect', { x: 50, y, width: f.arribaPct, height: hBarra, fill: cAr }));
+    s.append(el('text', { x: 1, y: y - 0.5, 'font-size': 4, fill: 'var(--tinta-suave)' }, f.label));
+    // montos en las puntas
+    s.append(el('text', { x: 49 - f.abajoPct, y: yTxt, 'font-size': 4, 'text-anchor': 'end', fill: 'var(--tinta-suave)' }, f.abajo));
+    s.append(el('text', { x: 51 + f.arribaPct, y: yTxt, 'font-size': 4, fill: 'var(--tinta-suave)' }, f.arriba));
   });
   return s;
 }
 
 function svgMatriz(m) {
-  const s = el('svg', { viewBox: '0 0 100 100', class: 'g-matriz' });
+  const s = el('svg', { viewBox: '0 0 100 100', preserveAspectRatio: 'none', class: 'g-matriz' });
   const paso = 20;
   m.celdas.forEach((fila, i) => fila.forEach((c, j) => {
     s.append(el('rect', {
       x: j * paso, y: i * paso, width: paso, height: paso,
-      class: `cel ${c.clase} ${c.actual ? 'actual' : ''}`,
+      class: ['cel', c.clase, c.actual && 'actual'].filter(Boolean).join(' '),
     }));
     s.append(el('text', { x: j * paso + paso / 2, y: i * paso + paso / 2 + 2, 'font-size': 4, 'text-anchor': 'middle', fill: 'var(--tinta)' }, c.valor));
   }));
@@ -77,11 +92,15 @@ export function montarEscenarios(contenedor) {
     for (const v of ve.sensibilidad.variables) {
       const cel = document.createElement('div');
       cel.className = 'sens-cel';
-      cel.innerHTML = `<h4>${v.label}</h4>`;
+      cel.innerHTML = `<h4>${esc(v.label)}</h4>`;
       cel.append(svgSensibilidad(v));
       const eje = document.createElement('div');
-      eje.className = 'rail-sub';
-      eje.textContent = '−50 %      0      +50 %';
+      eje.className = 'rail-sub sens-eje';
+      for (const t of ['−50 %', '0', '+50 %']) {
+        const sp = document.createElement('span');
+        sp.textContent = t;
+        eje.append(sp);
+      }
       cel.append(eje);
       paneles.sens.append(cel);
     }

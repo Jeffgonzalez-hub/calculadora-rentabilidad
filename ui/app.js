@@ -1,6 +1,6 @@
 import { montarFormulario } from './formulario.js';
 import { analizarDesdeFormulario, escenariosDesdeFormulario } from './adapter.js';
-import { pintar, alEditarPrecioCombo } from './render.js';
+import { pintar, alEditarPrecioCombo, alCambiarComboDesglose } from './render.js';
 import { montarEscenarios } from './graficos.js';
 
 const rail = document.getElementById('rail');
@@ -38,9 +38,10 @@ function debounce(fn, ms) {
 const esc = montarEscenarios(bloqueEsc);
 let escVisible = false;
 let escSucio = true;
+let comboDesglose = 1; // combo elegido en el <select> del bloque 3
 
 function recalcularPrincipal() {
-  const { vista } = analizarDesdeFormulario(formulario.leerForm());
+  const { vista } = analizarDesdeFormulario(formulario.leerForm(), comboDesglose);
   pintar(vista);
   escSucio = true;
   if (escVisible) recalcularEscenariosDebounced();
@@ -53,7 +54,7 @@ const recalcularPrincipalDebounced = debounce(recalcularPrincipal, 120);
 const recalcularEscenariosDebounced = debounce(recalcularEscenarios, 250);
 
 new IntersectionObserver((entradas) => {
-  escVisible = entradas[0].isIntersecting;
+  escVisible = entradas.at(-1).isIntersecting;
   if (escVisible && escSucio) recalcularEscenarios();
 }, { threshold: 0.15 }).observe(bloqueEsc);
 
@@ -64,5 +65,7 @@ alEditarPrecioCombo((n, valor) => {
   const elx = document.getElementById(id);
   if (elx) { elx.value = valor; recalcularPrincipalDebounced(); }
 });
+
+alCambiarComboDesglose((n) => { comboDesglose = n; recalcularPrincipal(); });
 
 recalcularPrincipal();

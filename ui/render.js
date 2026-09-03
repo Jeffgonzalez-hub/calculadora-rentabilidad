@@ -1,31 +1,42 @@
 /** vista → DOM de los bloques 1–5. Sin aritmética: todo llega listo en la vista. */
 
 const $ = (id) => document.getElementById(id);
+// escape defensivo: en Fase 3 el adapter va a leer nombres de producto del catálogo hacia
+// `title`/avisos. Hoy todo `mensaje`/`label` es constante de src/, pero lo dejamos cableado.
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 let cbEditarPrecio = null;
 export function alEditarPrecioCombo(cb) { cbEditarPrecio = cb; }
+let cbComboDesglose = null;
+export function alCambiarComboDesglose(cb) { cbComboDesglose = cb; }
+// se preserva entre repaints: sin esto la lista de avisos se colapsa ~120 ms tras cada tecla.
+let avisosAbiertos = false;
 
 function pintarVeredicto(v) {
   const b = $('bloque-veredicto');
   const r = v.veredicto;
+  const hayAvisos = v.avisos.length > 0;
+  const abierto = avisosAbiertos && hayAvisos;
   b.innerHTML = `
     <h2>Veredicto</h2>
     <div class="veredicto ${r.clase}">
       <div class="k">¿Es rentable?</div>
       <div class="grande" aria-live="polite">${r.titulo}</div>
-      <ul>${r.lineas.map((l) => `<li>${l}</li>`).join('')}</ul>
+      <ul>${r.lineas.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>
       <div class="avisos-linea">
         ⚠ ${v.resumenAvisos.avisos} aviso(s) · 🔴 ${v.resumenAvisos.errores} error(es)
-        ${v.avisos.length ? '<button type="button" class="ver-avisos" aria-expanded="false">ver ▾</button>' : ''}
+        ${hayAvisos ? `<button type="button" class="ver-avisos" aria-expanded="${abierto}">${abierto ? 'ocultar ▴' : 'ver ▾'}</button>` : ''}
       </div>
-      <ul class="lista-avisos" hidden>${v.avisos.map((a) => `<li class="${a.clase}">${a.mensaje}</li>`).join('')}</ul>
+      <ul class="lista-avisos"${abierto ? '' : ' hidden'}>${v.avisos.map((a) => `<li class="${a.clase}">${esc(a.mensaje)}</li>`).join('')}</ul>
     </div>`;
   const btn = b.querySelector('.ver-avisos');
   if (btn) btn.addEventListener('click', () => {
     const ul = b.querySelector('.lista-avisos');
-    const abierto = !ul.hidden;
-    ul.hidden = abierto;
-    btn.setAttribute('aria-expanded', String(!abierto));
-    btn.textContent = abierto ? 'ver ▾' : 'ocultar ▴';
+    const abrir = ul.hidden;
+    ul.hidden = !abrir;
+    avisosAbiertos = abrir;
+    btn.setAttribute('aria-expanded', String(abrir));
+    btn.textContent = abrir ? 'ocultar ▴' : 'ver ▾';
   });
 }
 
@@ -55,14 +66,22 @@ function pintarCombos(v) {
 
 function pintarDesglose(v) {
   const d = v.desglose;
-  $('bloque-desglose').innerHTML = `
+  const b = $('bloque-desglose');
+  b.innerHTML = `
     <h2>De dónde sale el precio</h2>
     <div class="card">
+      <label class="combo-sel-wrap">combo:
+        <select class="combo-sel" aria-label="Combo del desglose">
+          ${[1, 2, 3].map((n) => `<option value="${n}"${n === d.comboN ? ' selected' : ''}>${n}u</option>`).join('')}
+        </select>
+      </label>
       <div class="mono">${d.precio} =</div>
-      <div class="barra">${d.partes.map((p) => `<span class="${p.clase}" style="width:${p.anchoPct}%" title="${p.label} ${p.monto}"></span>`).join('')}</div>
-      <div class="leyenda">${d.partes.map((p) => `<span><span class="dot ${p.clase}" style="background:var(--${p.clase})"></span>${p.label} <span class="mono">${p.monto}</span></span>`).join('')}</div>
+      <div class="barra${d.clase ? ' ' + d.clase : ''}">${d.partes.map((p) => `<span class="${p.clase}" style="width:${p.anchoPct}%" title="${esc(p.label)} ${p.monto}"></span>`).join('')}</div>
+      <div class="leyenda">${d.partes.map((p) => `<span><span class="dot ${p.clase}" style="background:var(--${p.clase})"></span>${esc(p.label)} <span class="mono">${p.monto}</span></span>`).join('')}</div>
       <p class="rail-sub" style="margin-top:12px">— aparte — CAC <span class="mono">${d.cac}</span>. ${d.notaCac}</p>
     </div>`;
+  const sel = b.querySelector('.combo-sel');
+  if (sel) sel.addEventListener('change', () => cbComboDesglose && cbComboDesglose(Number(sel.value)));
 }
 
 function pintarEquilibrio(v) {

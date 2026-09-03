@@ -65,8 +65,18 @@ test('equilibrio: 6 filas; unidades/día sin fijos → no alcanzable', () => {
 test('proyección: disponible con presupuesto + pauta', () => {
   const v = vistaDe(FORM_BASE);
   assert.equal(v.proyeccion.disponible, true);
-  assert.equal(v.proyeccion.pedidosDia, '1,0');
+  assert.equal(v.proyeccion.pedidosDia, '1,00');            // M4: 2 decimales en cifras sub-1/día
+  assert.equal(v.proyeccion.ventasEntregadasDia, '0,75');   // antes redondeaba a "0,8"
   assert.match(v.proyeccion.utilidadMes, /^\$/);
+});
+
+test('desglose: precio bajo costo → barra-perdida y las 5 partes de costo suman ~100', () => {
+  const v = vistaDe(formDefecto({ ...FORM_BASE, modo: 'evaluar', precioBase: '20000', costoUnitario: '37500' }));
+  assert.equal(v.desglose.clase, 'barra-perdida');
+  const cinco = v.desglose.partes.slice(0, 5).reduce((a, p) => a + p.anchoPct, 0);
+  assert.ok(Math.abs(cinco - 100) < 0.5, `Σ 5 costos = ${cinco}`);
+  assert.equal(v.desglose.partes[5].clave, 'utilidad');
+  assert.equal(v.desglose.partes[5].anchoPct, 0);
 });
 
 test('sin pauta: veredicto sin-pauta, combos gana "—", proyección no disponible', () => {

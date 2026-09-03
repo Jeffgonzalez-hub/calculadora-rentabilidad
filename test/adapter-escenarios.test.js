@@ -43,3 +43,32 @@ test('escenarios: signo del tornado — subir un costo baja la utilidad', () => 
   const cc = e.tornado.find((f) => f.clave === 'costoConversacion');
   assert.equal(cc.dirArriba, 'neg'); // +10% de costoConversacion → utilidad baja
 });
+
+test('C1 · sin pauta (costoConversacion 0): nada de "$0" fabricado en escenarios', () => {
+  const e = escenariosDesdeFormulario(formDefecto({ ...FORM, costoConversacion: '0' }));
+
+  // sensibilidad: todas las variables sin dato → serie vacía / no disponible
+  for (const v of e.sensibilidad.variables) {
+    assert.equal(v.puntos.length, 0);
+    assert.equal(v.disponible, false);
+    assert.equal(v.cruceXPct, null);
+    assert.equal(v.ejeY.ceroPct, 50);
+    assert.equal(v.ejeY.max, '—');
+    assert.equal(v.ejeY.min, '—');
+  }
+
+  // matriz: cada celda sin dato → clase mx-sin-dato y valor "—"
+  const planas = e.matriz.celdas.flat();
+  assert.ok(planas.length === 25);
+  assert.ok(planas.every((c) => c.clase === 'mx-sin-dato' && c.valor === '—'));
+
+  // walk genérico: ningún string "$0" en toda la vista de escenarios
+  const vistos = [];
+  (function walk(x) {
+    if (x == null) return;
+    if (typeof x === 'string') { vistos.push(x); return; }
+    if (typeof x === 'object') for (const k of Object.keys(x)) walk(x[k]);
+  })(e);
+  assert.ok(!vistos.includes('$0'), `apareció "$0" en: ${vistos.filter((s) => s === '$0').length} lugar(es)`);
+  assert.ok(!vistos.some((s) => /^-?\$0$/.test(s)), 'apareció un "$0"/"-$0" fabricado');
+});
