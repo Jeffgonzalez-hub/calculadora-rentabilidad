@@ -15,7 +15,10 @@ function elegirMejorCombo(combos) {
   const pool = conFinal.length ? conFinal : combos;
   const clave = conFinal.length ? 'final' : 'porVentaEntregada';
   const mejor = pool.reduce((a, b) => (b.utilidad[clave] > a.utilidad[clave] ? b : a));
-  return { n: mejor.n, criterio: 'mayor utilidad limpia por venta entregada' };
+  const criterio = conFinal.length
+    ? 'mayor utilidad limpia por venta entregada'
+    : 'mayor utilidad por venta entregada (sin descontar pauta)';
+  return { n: mejor.n, criterio };
 }
 
 function calcularProyeccion(ctx, combos, rent) {
@@ -24,8 +27,17 @@ function calcularProyeccion(ctx, combos, rent) {
     presupuestoDia: B, costosFijosMes, diasOperacionMes, mezcla,
   } = ctx;
 
-  if (!(cc > 0) || !(B > 0)) {
+  if (!(cc > 0)) {
+    // Sin costo por conversación no se puede ni calcular CAC.
     return { pedidosDia: 0, ventasEntregadasDia: 0, utilidadDia: null, utilidadMes: null };
+  }
+  if (!(B > 0)) {
+    // Con pauta pero sin presupuesto: no hay ventas, solo corren los fijos.
+    const fijoDia = costosFijosMes / diasOperacionMes;
+    return {
+      pedidosDia: 0, ventasEntregadasDia: 0,
+      utilidadDia: -fijoDia, utilidadMes: -fijoDia * diasOperacionMes,
+    };
   }
 
   const conversacionesDia = B / cc;
@@ -36,7 +48,7 @@ function calcularProyeccion(ctx, combos, rent) {
   return { pedidosDia, ventasEntregadasDia, utilidadDia, utilidadMes: utilidadDia * diasOperacionMes };
 }
 
-export function analizar(entrada, { conEscenarios = true } = {}) {
+export function analizar(entrada, { conEscenarios = false } = {}) {
   const { ctx, entradaNormalizada, avisos: avisosNorm } = normalizarEntrada(entrada);
   const avisos = [...avisosNorm];
 
@@ -70,8 +82,14 @@ export function analizar(entrada, { conEscenarios = true } = {}) {
     unidadesDiaParaFijos: eq.unidadesDiaParaFijos(combos, ctx.mezcla),
   };
 
-  if (publicidad.disponible
-    && [equilibrio.tasaEntregaMinima, equilibrio.tasaCierreMinima, equilibrio.costoConversacionMaximo].some((v) => v == null)) {
+  const equilibrioNulos =
+    equilibrio.precioMinimo.some((p) => p.valor == null)
+    || equilibrio.roasMinimo == null
+    || equilibrio.unidadesDiaParaFijos == null
+    || (publicidad.disponible
+      && [equilibrio.tasaEntregaMinima, equilibrio.tasaCierreMinima, equilibrio.costoConversacionMaximo]
+        .some((v) => v == null));
+  if (equilibrioNulos) {
     avisos.push(aviso('equilibrio_inalcanzable', 'aviso', 'Algún punto de equilibrio quedó fuera de rango.'));
   }
 
