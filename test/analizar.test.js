@@ -18,7 +18,7 @@ test('devuelve la forma completa de Resultado', () => {
   assert.ok(Array.isArray(r.combos) && r.combos.length === 3);
   assert.ok(r.entradaNormalizada && Array.isArray(r.avisos));
   assert.ok(r.mejorCombo && r.equilibrio && r.proyeccion);
-  assert.equal(r.escenarios, null); // se completa en Task 11
+  assert.ok(r.escenarios && r.escenarios.tornado && r.escenarios.sensibilidad);
 });
 
 test('cada combo trae roas y descuentoMaximoPct completos', () => {

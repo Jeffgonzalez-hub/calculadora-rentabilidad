@@ -5,6 +5,7 @@ import { crearRentabilidad } from './rentabilidad.js';
 import { crearCombos } from './combos.js';
 import { crearEquilibrio } from './equilibrio.js';
 import { revisar } from './validacion.js';
+import { sensibilidadUnaVariable, tornado, matrizEntregaCierre, VARIABLES } from './escenarios.js';
 import { aviso } from './util.js';
 
 export { normalizarEntrada, DEFAULTS };
@@ -77,9 +78,15 @@ export function analizar(entrada, { conEscenarios = true } = {}) {
   const proyeccion = calcularProyeccion(ctx, combos, rent);
   const mejorCombo = elegirMejorCombo(combos);
 
-  // escenarios: se completan en Task 11
-  const escenarios = null;
-  void conEscenarios;
+  let escenarios = null;
+  if (conEscenarios) {
+    const A = (e) => analizar(e, { conEscenarios: false });
+    escenarios = {
+      sensibilidad: Object.fromEntries(VARIABLES.map((v) => [v, sensibilidadUnaVariable(entradaNormalizada, v, A)])),
+      tornado: tornado(entradaNormalizada, A),
+      matrizEntregaCierre: matrizEntregaCierre(entradaNormalizada, A),
+    };
+  }
 
   return { entradaNormalizada, avisos, combos, mejorCombo, equilibrio, proyeccion, escenarios };
 }
