@@ -16,8 +16,20 @@ las fórmulas corregidas — ver [`docs/auditoria-calculadora-actual.md`](docs/a
 | Fase | Qué | Estado |
 |---|---|---|
 | **1** | Motor puro: `analizar(entrada) → Resultado`, funciones puras, `node --test` | en diseño → implementación |
-| 2 | UI web (evolución del HTML) + despliegue | pendiente |
+| 2 | UI web (evolución del HTML) + despliegue | completa |
 | 3 | Integración con el CRM de ventas: adaptador que arma `entrada` desde el catálogo y las métricas reales | pendiente |
+
+## UI web (Fase 2)
+
+Interfaz de dos paneles sobre el motor. Sin build: `index.html` importa `ui/app.js`, que importa
+`ui/adapter.js` (puro, sin DOM — mapea `form`↔`entrada` y `Resultado`↔`vista`), que importa
+`src/index.js`. Los renderers (`ui/render.js`, `ui/graficos.js`) solo conocen la `vista`.
+
+Previsualizar local:
+
+    npm run dev        # http://localhost:5173
+
+Despliegue previsto: Cloudflare Pages en `calculadora.jdsmplus.co` (sin build; output dir = raíz).
 
 ## Diseño
 
