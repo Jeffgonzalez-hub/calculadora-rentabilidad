@@ -6,7 +6,16 @@ import { dirname, join } from 'node:path';
 
 const raiz = dirname(fileURLToPath(import.meta.url)) + '/..';
 const leer = (p) => readFileSync(join(raiz, p), 'utf8');
-const jsDe = (dir) => readdirSync(join(raiz, dir)).filter((f) => f.endsWith('.js')).map((f) => `${dir}/${f}`);
+// walk recursivo: si src/ crece con subcarpetas, la guarda las cubre igual.
+const jsDe = (dir) => {
+  const out = [];
+  for (const ent of readdirSync(join(raiz, dir), { withFileTypes: true })) {
+    const rel = `${dir}/${ent.name}`;
+    if (ent.isDirectory()) out.push(...jsDe(rel));
+    else if (ent.name.endsWith('.js')) out.push(rel);
+  }
+  return out;
+};
 
 test('src/** no menciona ui/, document, window, localStorage', () => {
   for (const f of jsDe('src')) {
@@ -26,8 +35,8 @@ test('ui/adapter.js y ui/formato.js son puros (sin DOM/red)', () => {
   }
 });
 
-test('ui/render.js y ui/graficos.js NO importan del motor', () => {
-  for (const f of ['ui/render.js', 'ui/graficos.js']) {
+test('ui/render.js, ui/graficos.js y ui/formulario.js NO importan del motor', () => {
+  for (const f of ['ui/render.js', 'ui/graficos.js', 'ui/formulario.js']) {
     const txt = leer(f);
     assert.ok(!/from ['"]\.\.\/src\//.test(txt), `${f} importa de ../src/`);
   }
