@@ -27,7 +27,7 @@ test('tasaEntrega = 0 -> clamp + aviso, sin NaN ni Infinity', () => {
 
 test('escaleraPrecios vacía en modo sugerir -> 3 combos sugeridos', () => {
   const r = analizar(BASE);
-  assert.deepEqual(r.combos.map((c) => c.sugerido), [true, true, true]);
+  assert.deepEqual(r.combos.map((c) => c.esSugerido), [true, true, true]);
 });
 
 test('mezcla que no suma 1 -> renormaliza + aviso', () => {

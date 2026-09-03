@@ -6,7 +6,6 @@ const UMBRALES = [
   { min: 0.30, nivel: 'premium' },
   { min: 0.20, nivel: 'sano' },
   { min: 0.10, nivel: 'apretado' },
-  { min: 0.00001, nivel: 'muy-apretado' },
 ];
 
 export function crearCombos(ctx, costos, rent) {
@@ -30,18 +29,23 @@ export function crearCombos(ctx, costos, rent) {
     if (margenNeto == null) return { nivel: 'sin-dato', pct: null };
     const pct = margenNeto * 100;
     const hit = UMBRALES.find((u) => margenNeto >= u.min);
-    return { nivel: hit ? hit.nivel : 'pierde', pct };
+    if (hit) return { nivel: hit.nivel, pct };
+    // pct > 0 => 'muy-apretado'; exactamente 0 o negativo => 'pierde'
+    return { nivel: margenNeto > 0 ? 'muy-apretado' : 'pierde', pct };
   };
 
   const evaluarCombo = (n) => {
     const avisos = [];
     let ingreso;
-    let sugerido = false;
+    let esSugerido = false;
     const fila = filaEscalera(n);
+    // Se calcula SIEMPRE (también cuando la escalera fija el precio) para que Fase 3
+    // pueda comparar el precio de catálogo contra el que sugiere el motor.
+    const precioSugerido = sugerirPrecioCombo(n);
 
     if (objetivo.modo === 'sugerir') {
       if (fila) { ingreso = fila.precio; }
-      else { ingreso = sugerirPrecioCombo(n); sugerido = true; }
+      else { ingreso = precioSugerido; esSugerido = true; }
     } else {
       if (n === 1) { ingreso = precioBase ?? 0; }
       else if (fila) { ingreso = fila.precio; }
@@ -56,7 +60,8 @@ export function crearCombos(ctx, costos, rent) {
     const combo = {
       n,
       ingreso,
-      sugerido,
+      precioSugerido,
+      esSugerido,
       costo: {
         cogs: costos.cogs(n),
         fleteIda,
