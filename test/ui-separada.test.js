@@ -26,7 +26,7 @@ test('src/** no menciona ui/, document, window, localStorage', () => {
   }
 });
 
-test('ui/adapter.js y ui/formato.js son puros (sin DOM/red)', () => {
+test('ui/adapter.js y ui/formato.js son puros (sin DOM/red/almacenamiento)', () => {
   for (const f of ['ui/adapter.js', 'ui/formato.js']) {
     const txt = leer(f);
     for (const prohibido of ['document', 'window', 'localStorage', 'fetch(']) {
@@ -35,14 +35,28 @@ test('ui/adapter.js y ui/formato.js son puros (sin DOM/red)', () => {
   }
 });
 
-test('ui/render.js, ui/graficos.js y ui/formulario.js NO importan del motor', () => {
-  for (const f of ['ui/render.js', 'ui/graficos.js', 'ui/formulario.js']) {
+test('ui/perfil.js: puede usar localStorage, pero nada de DOM/red ni imports de ../src/', () => {
+  const txt = leer('ui/perfil.js');
+  for (const prohibido of ['document', 'window', 'fetch(']) {
+    assert.ok(!txt.includes(prohibido), `ui/perfil.js menciona "${prohibido}"`);
+  }
+  assert.ok(!/from ['"]\.\.\/src\//.test(txt), 'ui/perfil.js importa de ../src/');
+});
+
+test('ui/render.js, ui/graficos.js, ui/formulario.js, ui/perfil-pantalla.js NO importan del motor', () => {
+  for (const f of ['ui/render.js', 'ui/graficos.js', 'ui/formulario.js', 'ui/perfil-pantalla.js']) {
     const txt = leer(f);
     assert.ok(!/from ['"]\.\.\/src\//.test(txt), `${f} importa de ../src/`);
   }
 });
 
-test('ui/app.js solo importa lógica vía ./adapter.js (no ../src/ directo)', () => {
+test('ui/adapter.js solo importa del motor vía ../src/index.js (nada más profundo)', () => {
+  const txt = leer('ui/adapter.js');
+  const imports = [...txt.matchAll(/from ['"](\.\.\/src\/[^'"]+)['"]/g)].map((m) => m[1]);
+  assert.deepEqual(imports, ['../src/index.js'], `imports de ../src/ inesperados: ${imports.join(', ')}`);
+});
+
+test('ui/app.js solo importa lógica vía ./adapter.js y ./perfil.js (no ../src/ directo)', () => {
   const txt = leer('ui/app.js');
   assert.ok(!/from ['"]\.\.\/src\//.test(txt), 'ui/app.js importa de ../src/ directo');
 });
