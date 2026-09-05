@@ -3,32 +3,30 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Calculadora de rentabilidad · contraentrega</title>
+  <title>Precio con confianza · contraentrega</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="ui/estilos.css">
 </head>
 <body>
-  <div class="app">
-    <aside id="rail" class="rail">
-      <header class="rail-head">
-        <h1>Calculadora de rentabilidad</h1>
-        <p class="rail-sub">contraentrega · Colombia</p>
-      </header>
-      <div id="rail-form"><!-- formulario.js --></div>
-      <p class="rail-nota">Los valores por defecto salen del motor. Un valor fuera de rango se ajusta y aparece un aviso.</p>
-    </aside>
+  <main class="app">
+    <div class="topbar">
+      <h1>Precio con confianza</h1>
+      <button type="button" id="btn-perfil" class="btn-perfil">Perfil económico</button>
+    </div>
 
-    <main id="resultados" class="resultados">
-      <section id="bloque-veredicto" class="bloque"></section>
-      <section id="bloque-combos" class="bloque"></section>
-      <section id="bloque-desglose" class="bloque"></section>
-      <section id="bloque-equilibrio" class="bloque"></section>
-      <section id="bloque-proyeccion" class="bloque"></section>
-      <section id="bloque-escenarios" class="bloque"></section>
-    </main>
-  </div>
+    <div id="entrada-basica"></div>
+
+    <section id="bloque-hero"></section>
+
+    <section id="bloque-secundario"></section>
+
+    <section id="bloque-escenarios" class="acc-escenarios"></section>
+  </main>
+
+  <div id="perfil-pantalla"></div>
+
   <script type="module" src="ui/app.js"></script>
 </body>
 </html>
