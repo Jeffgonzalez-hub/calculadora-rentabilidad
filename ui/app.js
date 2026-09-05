@@ -1,71 +1,66 @@
-import { montarFormulario } from './formulario.js';
-import { analizarDesdeFormulario, escenariosDesdeFormulario } from './adapter.js';
-import { pintar, alEditarPrecioCombo, alCambiarComboDesglose } from './render.js';
+// ui/app.js — punto de entrada. Solo importa lógica vía ./adapter.js y ./perfil.js.
+import { montarEntradaBasica } from './formulario.js';
+import { analizarDesdeFormulario, escenariosDesdeFormulario, perfilToVista } from './adapter.js';
+import { montarResultado, pintarHero, pintarSecundario, alPulsarCta, alCambiarComboDesglose } from './render.js';
+import { montarPerfilPantalla } from './perfil-pantalla.js';
 import { montarEscenarios } from './graficos.js';
+import { cargarPerfil, guardarPerfil, restablecerPerfil } from './perfil.js';
 
-const rail = document.getElementById('rail');
-const railForm = document.getElementById('rail-form');
-const bloqueEsc = document.getElementById('bloque-escenarios');
-let formulario;
+const $ = (id) => document.getElementById(id);
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
-// responsive lite: bajo 900px el formulario del rail se puede colapsar
-const mqAngosto = matchMedia('(max-width:900px)');
-const railToggle = document.createElement('button');
-railToggle.type = 'button';
-railToggle.className = 'rail-toggle';
-railToggle.setAttribute('aria-controls', 'rail-form');
-function pintarRailToggle() {
-  const colapsado = rail.classList.contains('rail--colapsado');
-  railToggle.textContent = colapsado ? 'Mostrar entradas ▾' : 'Ocultar entradas ▴';
-  railToggle.setAttribute('aria-expanded', String(!colapsado));
-}
-railToggle.addEventListener('click', () => {
-  rail.classList.toggle('rail--colapsado');
-  pintarRailToggle();
-});
-rail.insertBefore(railToggle, railForm);
-pintarRailToggle();
-// al volver a pantalla ancha, asegurar que el formulario quede visible
-mqAngosto.addEventListener('change', (e) => {
-  if (!e.matches) { rail.classList.remove('rail--colapsado'); pintarRailToggle(); }
-});
+let perfil = cargarPerfil();
+let comboDesglose = 1;
 
-function debounce(fn, ms) {
-  let t;
-  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
-}
+montarResultado();
+const entrada = montarEntradaBasica($('entrada-basica'), { alCambiar: () => recalcularDebounced() });
 
-const esc = montarEscenarios(bloqueEsc);
+const escenarios = montarEscenarios($('bloque-escenarios'));
 let escVisible = false;
 let escSucio = true;
-let comboDesglose = 1; // combo elegido en el <select> del bloque 3
 
-function recalcularPrincipal() {
-  const { vista } = analizarDesdeFormulario(formulario.leerForm(), comboDesglose);
-  pintar(vista);
+const perfilPantalla = montarPerfilPantalla($('perfil-pantalla'), {
+  alCambiarCampo: (clave, campo) => {
+    perfil = { ...perfil, [clave]: campo };
+    perfilPantalla.pintar(perfilToVista(perfil));
+    recalcularDebounced();
+  },
+  alGuardar: () => { guardarPerfil(perfil); perfilPantalla.cerrar(); },
+  alRestablecer: () => { perfil = restablecerPerfil(); perfilPantalla.pintar(perfilToVista(perfil)); recalcular(); },
+  alCerrar: () => {},
+});
+perfilPantalla.pintar(perfilToVista(perfil));
+
+$('btn-perfil').addEventListener('click', () => perfilPantalla.abrir($('btn-perfil')));
+
+alPulsarCta((destino, clave) => {
+  if (destino === 'perfil') {
+    perfilPantalla.abrir($('btn-perfil'));
+    if (clave) perfilPantalla.enfocarClave(clave);
+  } else {
+    entrada.enfocar(destino);
+  }
+});
+alCambiarComboDesglose((n) => { comboDesglose = n; recalcular(); });
+
+function recalcular() {
+  const form = entrada.leerForm();
+  const { vista, hero } = analizarDesdeFormulario(form, perfil, comboDesglose);
+  pintarHero(hero);
+  pintarSecundario(vista);
   escSucio = true;
   if (escVisible) recalcularEscenariosDebounced();
 }
 function recalcularEscenarios() {
-  esc.pintar(escenariosDesdeFormulario(formulario.leerForm()));
+  escenarios.pintar(escenariosDesdeFormulario(entrada.leerForm(), perfil));
   escSucio = false;
 }
-const recalcularPrincipalDebounced = debounce(recalcularPrincipal, 120);
+const recalcularDebounced = debounce(recalcular, 120);
 const recalcularEscenariosDebounced = debounce(recalcularEscenarios, 250);
 
 new IntersectionObserver((entradas) => {
   escVisible = entradas.at(-1).isIntersecting;
   if (escVisible && escSucio) recalcularEscenarios();
-}, { threshold: 0.15 }).observe(bloqueEsc);
+}, { threshold: 0.15 }).observe($('bloque-escenarios'));
 
-formulario = montarFormulario(railForm, { alCambiar: () => { recalcularPrincipalDebounced(); if (escVisible) esc.marcarDesactualizado(); } });
-
-alEditarPrecioCombo((n, valor) => {
-  const id = n === 1 ? 'f-precioBase' : `f-precio${n}`;
-  const elx = document.getElementById(id);
-  if (elx) { elx.value = valor; recalcularPrincipalDebounced(); }
-});
-
-alCambiarComboDesglose((n) => { comboDesglose = n; recalcularPrincipal(); });
-
-recalcularPrincipal();
+recalcular();
