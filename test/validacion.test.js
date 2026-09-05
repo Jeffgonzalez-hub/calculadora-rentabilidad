@@ -45,3 +45,27 @@ test('caso sano: sin avisos de error', () => {
   const combos = [{ n: 1, ingreso: 104100 }, { n: 2, ingreso: 173100 }, { n: 3, ingreso: 242100 }];
   assert.equal(revisar(ctx, combos).filter((a) => a.nivel === 'error').length, 0);
 });
+
+test('degradante FALTANTE -> aviso obligatorio "datos_faltantes_en_cero" con nombres', () => {
+  const ctx = ctxDe({ producto: { costoUnitario: 37500 }, supuestos: { fleteIda: 20000 }, mercado: { costoConversacion: 4000 } });
+  const procedencia = { comisionRecaudoPct: 'FALTANTE', empaquePorPedido: 'FALTANTE' };
+  const av = revisar(ctx, [{ n: 1, ingreso: 100000 }], procedencia);
+  const f = av.find((a) => a.codigo === 'datos_faltantes_en_cero');
+  assert.ok(f, 'debe emitir el aviso');
+  assert.equal(f.nivel, 'aviso');
+  assert.match(f.mensaje, /comisionRecaudoPct/);
+  assert.match(f.mensaje, /empaquePorPedido/);
+});
+
+test('sin procedencia (llamada de 2 args, compatibilidad hacia atrás) no lanza y no avisa de faltantes', () => {
+  const ctx = ctxDe({ producto: { costoUnitario: 37500 }, supuestos: { fleteIda: 20000 }, mercado: { costoConversacion: 4000 } });
+  const av = revisar(ctx, [{ n: 1, ingreso: 100000 }]);
+  assert.ok(!av.some((a) => a.codigo === 'datos_faltantes_en_cero'));
+});
+
+test('todo REAL/SUPUESTO (sin FALTANTE) -> no dispara el aviso', () => {
+  const ctx = ctxDe({ producto: { costoUnitario: 37500 }, supuestos: { fleteIda: 20000 }, mercado: { costoConversacion: 4000 } });
+  const procedencia = { comisionRecaudoPct: 'SUPUESTO', costoUnitario: 'REAL' };
+  const av = revisar(ctx, [{ n: 1, ingreso: 100000 }], procedencia);
+  assert.ok(!av.some((a) => a.codigo === 'datos_faltantes_en_cero'));
+});
