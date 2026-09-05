@@ -40,14 +40,40 @@
     },
     "objetivo": {
       "modo": "sugerir",
-      "utilidadObjetivo": 40000
+      "regla": {
+        "tipo": "utilidad_fija",
+        "valor": 40000
+      }
     }
+  },
+  "procedencia": {
+    "costoUnitario": "SUPUESTO",
+    "fleteIda": "SUPUESTO",
+    "fleteDevolucion": "FALTANTE",
+    "feeDevolucion": "FALTANTE",
+    "pctProductoPerdidoEnDevolucion": "FALTANTE",
+    "comisionRecaudoPct": "FALTANTE",
+    "comisionRecaudoFijo": "FALTANTE",
+    "empaquePorPedido": "FALTANTE",
+    "costoAtencionConversacion": "FALTANTE",
+    "tasaEntrega": "SUPUESTO",
+    "tasaCierre": "SUPUESTO",
+    "costoConversacion": "SUPUESTO",
+    "costosFijosMes": "SUPUESTO",
+    "diasOperacionMes": "SUPUESTO",
+    "cac": "FALTANTE",
+    "precioRecomendado": "FALTANTE"
   },
   "avisos": [
     {
       "codigo": "devolucion_sin_costo",
       "nivel": "aviso",
       "mensaje": "No se modeló ningún costo de devolución; la contraentrega parece sin riesgo."
+    },
+    {
+      "codigo": "datos_faltantes_en_cero",
+      "nivel": "aviso",
+      "mensaje": "7 dato(s) faltante(s) se asumieron en $0 (fleteDevolucion, feeDevolucion, pctProductoPerdidoEnDevolucion, comisionRecaudoPct, comisionRecaudoFijo, empaquePorPedido, costoAtencionConversacion); el precio recomendado es un piso, el real será mayor."
     }
   ],
   "combos": [
@@ -182,11 +208,56 @@
         "valor": 165833.33
       }
     ],
+    "precioMinimoOperativo": [
+      {
+        "n": 1,
+        "valor": 64166.67
+      },
+      {
+        "n": 2,
+        "valor": 101666.67
+      },
+      {
+        "n": 3,
+        "valor": 139166.67
+      }
+    ],
     "tasaEntregaMinima": 0.59,
     "tasaCierreMinima": 0.13,
     "costoConversacionMaximo": 6140,
     "roasMinimo": 2.57,
     "unidadesDiaParaFijos": 0
+  },
+  "recomendacion": {
+    "estado": "estimacion_neto",
+    "precio": 105100,
+    "precioCrudo": 104166.67,
+    "tipoMargen": "neto",
+    "margenObjetivo": null,
+    "margenLogrado": 0.14,
+    "utilidadPorVentaEntregada": 40933.33,
+    "confianza": {
+      "supuestos": [
+        "costoUnitario",
+        "fleteIda",
+        "tasaEntrega",
+        "tasaCierre",
+        "costoConversacion",
+        "costosFijosMes",
+        "diasOperacionMes"
+      ],
+      "faltantesAsumidosCero": [
+        "fleteDevolucion",
+        "feeDevolucion",
+        "pctProductoPerdidoEnDevolucion",
+        "comisionRecaudoPct",
+        "comisionRecaudoFijo",
+        "empaquePorPedido",
+        "costoAtencionConversacion"
+      ],
+      "cacDisponible": true
+    },
+    "avisos": []
   },
   "proyeccion": {
     "pedidosDia": 1,

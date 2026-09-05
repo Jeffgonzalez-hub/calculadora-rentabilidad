@@ -10,7 +10,7 @@ const DEFAULTS_HTML = {
   mercado: { tasaEntrega: 0.75, tasaCierre: 0.20, costoConversacion: 4000 },
   publicidad: { presupuestoDia: 20000 },
   overhead: { costosFijosMes: 0, diasOperacionMes: 30 },
-  objetivo: { modo: 'sugerir', utilidadObjetivo: 40000 },
+  objetivo: { modo: 'sugerir', regla: { tipo: 'utilidad_fija', valor: 40000 } },
 };
 
 test('devuelve la forma completa de Resultado', () => {
@@ -106,4 +106,43 @@ test('presupuesto 0 con pauta y fijos: solo corren los fijos, no todo-null', () 
   assert.equal(r.proyeccion.ventasEntregadasDia, 0);
   assert.ok(cerca(r.proyeccion.utilidadDia, -100000));
   assert.ok(cerca(r.proyeccion.utilidadMes, -3_000_000));
+});
+
+// append to test/analizar.test.js
+test('procedencia.cac hereda el peor estado entre costoConversacion y costoAtencionConversacion', () => {
+  const r = analizar({ ...DEFAULTS_HTML, mercado: { ...DEFAULTS_HTML.mercado, costoConversacion: 4000 }, procedencia: { costoConversacion: 'REAL', costoAtencionConversacion: 'FALTANTE' } });
+  assert.equal(r.procedencia.cac, 'FALTANTE');
+});
+
+test('procedencia.precioRecomendado hereda el peor estado de todo lo que afecta el precio', () => {
+  const rTodoReal = analizar({
+    producto: { costoUnitario: 37500 },
+    supuestos: { fleteIda: 20000, fleteDevolucion: 0, feeDevolucion: 0, pctProductoPerdidoEnDevolucion: 0, comisionRecaudoPct: 0, comisionRecaudoFijo: 0, empaquePorPedido: 0, costoAtencionConversacion: 0 },
+    mercado: { tasaEntrega: 0.75, tasaCierre: 0.20, costoConversacion: 4000 },
+    procedencia: {
+      costoUnitario: 'REAL', fleteIda: 'REAL', fleteDevolucion: 'REAL', feeDevolucion: 'REAL',
+      pctProductoPerdidoEnDevolucion: 'REAL', comisionRecaudoPct: 'REAL', comisionRecaudoFijo: 'REAL',
+      empaquePorPedido: 'REAL', costoAtencionConversacion: 'REAL', tasaEntrega: 'REAL', tasaCierre: 'REAL', costoConversacion: 'REAL',
+    },
+  });
+  assert.equal(rTodoReal.procedencia.precioRecomendado, 'REAL');
+  // costosFijosMes/diasOperacionMes NO participan del precio: quedar FALTANTE ahí no debe degradar precioRecomendado.
+  const rSoloFijosFaltantes = analizar({
+    ...DEFAULTS_HTML,
+    procedencia: { costoUnitario: 'REAL', fleteIda: 'REAL', tasaEntrega: 'REAL', tasaCierre: 'REAL', costoConversacion: 'REAL' },
+  });
+  // el resto de económicas ni siquiera se pasó -> siguen SUPUESTO/FALTANTE por inferencia, así que
+  // esta entrada de por sí no queda "todo real"; se usa solo para confirmar que el campo existe y es un estado válido.
+  assert.ok(['REAL', 'SUPUESTO', 'FALTANTE'].includes(rSoloFijosFaltantes.procedencia.precioRecomendado));
+});
+
+test('degradante FALTANTE llega hasta analizar(): aviso datos_faltantes_en_cero presente en resultado.avisos', () => {
+  const r = analizar({
+    producto: { costoUnitario: 37500 },
+    supuestos: { fleteIda: 20000 }, // comisionRecaudoPct, empaquePorPedido, etc. ni se mencionan -> FALTANTE por inferencia
+    mercado: { tasaEntrega: 0.75, tasaCierre: 0.20, costoConversacion: 4000 },
+  });
+  const f = r.avisos.find((a) => a.codigo === 'datos_faltantes_en_cero');
+  assert.ok(f, 'el aviso debe llegar hasta el resultado final de analizar()');
+  assert.match(f.mensaje, /comisionRecaudoPct/);
 });

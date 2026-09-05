@@ -6,7 +6,7 @@ const BASE = {
   producto: { costoUnitario: 37500, precioBase: null, escaleraPrecios: [] },
   supuestos: { fleteIda: 20000 },
   mercado: { tasaEntrega: 0.75, tasaCierre: 0.20, costoConversacion: 4000 },
-  objetivo: { modo: 'sugerir', utilidadObjetivo: 40000 },
+  objetivo: { modo: 'sugerir', regla: { tipo: 'utilidad_fija', valor: 40000 } },
 };
 
 const finito = (v) => v == null || Number.isFinite(v);

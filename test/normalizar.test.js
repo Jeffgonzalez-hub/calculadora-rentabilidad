@@ -4,7 +4,7 @@ import { normalizarEntrada } from '../src/normalizar.js';
 import { inferirProcedencia } from '../src/procedencia.js';
 
 test('aplica defaults cuando la entrada está casi vacía', () => {
-  const { ctx } = normalizarEntrada({ producto: { costoUnitario: 37500 }, objetivo: { modo: 'sugerir', utilidadObjetivo: 40000 } });
+  const { ctx } = normalizarEntrada({ producto: { costoUnitario: 37500 }, objetivo: { modo: 'sugerir', regla: { tipo: 'utilidad_fija', valor: 40000 } } });
   assert.equal(ctx.fleteIda, 0);
   assert.equal(ctx.cesionUtilidadPorUnidadExtra, 0.20);
   assert.equal(ctx.tasaEntrega, 0.75);
@@ -30,7 +30,7 @@ test('renormaliza la mezcla y avisa', () => {
 test('resuelve el modo por precioBase', () => {
   assert.equal(normalizarEntrada({ producto: { costoUnitario: 1, precioBase: 100000 } }).ctx.objetivo.modo, 'evaluar');
   assert.equal(normalizarEntrada({ producto: { costoUnitario: 1, precioBase: null } }).ctx.objetivo.modo, 'sugerir');
-  assert.equal(normalizarEntrada({ producto: { costoUnitario: 1, precioBase: 100000 }, objetivo: { modo: 'sugerir', utilidadObjetivo: 1 } }).ctx.objetivo.modo, 'sugerir');
+  assert.equal(normalizarEntrada({ producto: { costoUnitario: 1, precioBase: 100000 }, objetivo: { modo: 'sugerir', regla: { tipo: 'utilidad_fija', valor: 1 } } }).ctx.objetivo.modo, 'sugerir');
 });
 
 test('normaliza y ordena la escalera de precios, descarta filas basura', () => {
