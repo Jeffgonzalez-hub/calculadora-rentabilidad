@@ -80,6 +80,103 @@ export function perfilToVista(perfil) {
   return { confianza: contarConfianza(perfil), filas, prioridades };
 }
 
+// --- Resultado.recomendacion -> vista del hero card (los 8 estados de §B.7) ---
+
+const ACENTO_POR_ESTADO = {
+  sin_costo: 'neutro', sin_objetivo: 'neutro',
+  no_calculable: 'rojo', no_alcanzable: 'rojo',
+  ok_neto: 'verde', estimacion_neto: 'ambar',
+  ok_bruto: 'rojo', estimacion_bruto: 'rojo',
+};
+
+function chipsDe(rec) {
+  if (rec.tipoMargen == null) return [];
+  const tipo = rec.tipoMargen === 'neto'
+    ? { texto: 'NETO', tono: 'verde' }
+    : { texto: 'BRUTO', tono: 'ambar' };
+  const confia = rec.estado.startsWith('ok_')
+    ? { texto: 'REAL', tono: 'verde' }
+    : { texto: 'ESTIMADO', tono: 'ambar' };
+  return [tipo, confia];
+}
+
+function lineaConfianza(rec) {
+  const s = rec.confianza.supuestos.length;
+  const f = rec.confianza.faltantesAsumidosCero.length;
+  const partes = [];
+  if (s > 0) partes.push(`${s} supuesto${s === 1 ? '' : 's'} usado${s === 1 ? '' : 's'}`);
+  if (f > 0) partes.push(`${f} dato${f === 1 ? '' : 's'} faltante${f === 1 ? '' : 's'} — no asumido${f === 1 ? '' : 's'} en $0, se avisan abajo`);
+  if (!rec.confianza.cacDisponible) partes.unshift('falta el costo por conversación (CAC): precio en modo operativo, no neto');
+  return partes.join(' · ');
+}
+
+function porQueDe(rec) {
+  if (rec.estado === 'no_calculable') {
+    return 'El flete de ida entra directo en el costo que cada venta entregada tiene que cubrir, incluida su parte del colchón por devoluciones. Sin ese número no hay un precio honesto que darte — por eso lo bloqueamos en vez de asumir $0.';
+  }
+  if (rec.estado === 'sin_costo') return 'Escribí el costo del proveedor para empezar.';
+  if (rec.estado === 'sin_objetivo') return 'Elegí el margen que querés ganar.';
+  if (rec.estado === 'no_alcanzable') return 'El margen que pediste más la comisión de recaudo se comen todo el precio. Bajá el margen o revisá la comisión.';
+  const sinCac = !rec.confianza.cacDisponible;
+  return sinCac
+    ? 'Este precio junta el costo del producto, el flete de ida y vuelta, y un colchón para las devoluciones que no llegan — pero todavía NO incluye lo que cuesta conseguir la venta, porque ese dato falta.'
+    : 'Este precio junta el costo del producto, el flete de ida y vuelta, un colchón para las devoluciones que no llegan, y lo que cuesta conseguir cada venta — todo dividido entre el margen que querés ganar.';
+}
+
+function ctaDe(rec) {
+  switch (rec.estado) {
+    case 'sin_costo': return { texto: 'Escribí el costo del proveedor', destino: 'costo' };
+    case 'sin_objetivo': return { texto: 'Elegí el margen', destino: 'margen' };
+    case 'no_calculable': return { texto: `Completá ${rec.parametroFaltante === 'fleteIda' ? 'el flete de ida' : rec.parametroFaltante} en el Perfil económico`, destino: 'perfil', clave: rec.parametroFaltante };
+    case 'no_alcanzable': return { texto: 'Ajustá el margen o la comisión', destino: 'margen' };
+    case 'ok_neto': return null;
+    default: return { texto: 'Mejorar precisión', destino: 'perfil' };
+  }
+}
+
+function advertenciaDe(rec) {
+  if (rec.estado !== 'ok_bruto' && rec.estado !== 'estimacion_bruto') return '';
+  return 'Este precio NO incluye publicidad — es margen operativo, no margen neto garantizado. '
+    + 'Cuando cargués tu costo real de conseguir cada venta, el margen neto real puede quedar bastante por debajo de este número.';
+}
+
+export function recomendacionToVista(resultado) {
+  const rec = resultado.recomendacion;
+  const pmo1 = (resultado.equilibrio.precioMinimoOperativo ?? []).find((p) => p.n === 1)?.valor ?? null;
+  const muestraPrecio = rec.precio != null;
+
+  const tituloBloqueo = {
+    sin_costo: 'Escribí el costo del proveedor',
+    sin_objetivo: 'Elegí el margen que querés ganar',
+    no_calculable: `Falta ${rec.parametroFaltante === 'fleteIda' ? 'el flete de ida' : rec.parametroFaltante} para calcular`,
+    no_alcanzable: `Un margen del ${Math.round((rec.margenObjetivo ?? 0) * 100)}% no es posible con esta comisión de recaudo`,
+  };
+
+  const lineaMargen = muestraPrecio
+    ? `Margen ${rec.tipoMargen} objetivo ${pct(rec.margenObjetivo ?? 0, 0)} → logrado ${oGuion(rec.margenLogrado, (x) => '≈ ' + pct(x, 1))}`
+    : '';
+  const lineaUtilidad = muestraPrecio
+    ? `Utilidad ${rec.tipoMargen === 'operativo' ? 'operativa ' : ''}estimada por venta entregada ${oGuion(rec.utilidadPorVentaEntregada, (x) => '≈ ' + pesos(x))}`
+      + (rec.tipoMargen === 'operativo' ? ' — sin restar publicidad' : '')
+    : '';
+
+  return {
+    estado: rec.estado,
+    muestraPrecio,
+    precio: muestraPrecio ? pesos(rec.precio) : null,
+    acento: ACENTO_POR_ESTADO[rec.estado] ?? 'neutro',
+    chips: muestraPrecio ? chipsDe(rec) : [],
+    titulo: muestraPrecio ? '' : (tituloBloqueo[rec.estado] ?? 'Sin recomendación'),
+    lineaMargen,
+    lineaUtilidad,
+    advertencia: advertenciaDe(rec),
+    confianza: muestraPrecio ? lineaConfianza(rec) : '',
+    porQue: porQueDe(rec),
+    cta: ctaDe(rec),
+    precioMinimoOperativo: pmo1 == null ? null : pesos(pmo1),
+  };
+}
+
 // --- Resultado del motor → vista que pinta el renderer ---
 
 const ANCHO_SEMAFORO = { premium: 100, sano: 75, apretado: 48, 'muy-apretado': 25, pierde: 12, 'sin-dato': 0 };
