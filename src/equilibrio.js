@@ -16,6 +16,10 @@ export function crearEquilibrio(ctx, costos, rent, publicidad) {
       + costos.colchonDevoluciones(n) + cac) / (1 - comisionRecaudoPct);
   };
 
+  const precioMinimoOperativo = (n) =>
+    (costos.cogs(n) + fleteIda + comisionRecaudoFijo + empaquePorPedido + costos.colchonDevoluciones(n))
+    / (1 - comisionRecaudoPct);
+
   const descuentoMaximoPct = (n, precio) => {
     const pm = precioMinimo(n);
     if (pm == null || !(precio > 0)) return null;
@@ -66,7 +70,7 @@ export function crearEquilibrio(ctx, costos, rent, publicidad) {
   };
 
   return {
-    precioMinimo, descuentoMaximoPct, tasaEntregaMinima, tasaCierreMinima,
+    precioMinimo, precioMinimoOperativo, descuentoMaximoPct, tasaEntregaMinima, tasaCierreMinima,
     costoConversacionMaximo, roasMinimo, unidadesDiaParaFijos,
   };
 }

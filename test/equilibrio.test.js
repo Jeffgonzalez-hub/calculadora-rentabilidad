@@ -85,3 +85,23 @@ test('equilibrio fuera de rango devuelve null, nunca > 1', () => {
   const { eq } = mod();
   assert.equal(eq.tasaEntregaMinima(1, 1), null);
 });
+
+test('precioMinimoOperativo: K0(1)/(1-q), siempre calculable (no depende de CAC)', () => {
+  const { eq } = mod({ mercado: { costoConversacion: 0 } }); // sin pauta -> precioMinimo (con CAC) es null
+  assert.equal(eq.precioMinimo(1), null);
+  // K0(1) = cogs(37500)+fleteIda(20000)+colchón((0.25/0.75)*20000=6666.667) = 64166.667 ; q=0 -> /1
+  assert.ok(cerca(eq.precioMinimoOperativo(1), 64166.667));
+});
+
+test('precioMinimoOperativo: en ese precio, utilidadPorVentaEntregada es 0', () => {
+  const { eq, rent } = mod();
+  const pmo = eq.precioMinimoOperativo(1);
+  assert.ok(cerca(rent.utilidadPorVentaEntregada(1, pmo), 0, 1));
+});
+
+test('precioMinimoOperativo: siempre <= precioMinimo cuando hay CAC (adquisición se suma aparte)', () => {
+  const { eq } = mod();
+  const pmo = eq.precioMinimoOperativo(1);
+  const pm = eq.precioMinimo(1);
+  assert.ok(pm != null && pmo < pm);
+});
