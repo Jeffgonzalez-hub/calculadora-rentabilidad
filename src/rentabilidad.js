@@ -24,6 +24,11 @@ export function crearRentabilidad(ctx, costos, publicidad) {
     return { bruto: brutoAntes / precio, neto: final == null ? null : final / precio };
   };
 
+  const margenOperativo = (n, precio) => {
+    if (!(precio > 0)) return null;
+    return utilidadPorVentaEntregada(n, precio) / precio;
+  };
+
   const markup = (n, precio) => {
     const base = cogs(n);
     const baseFlete = cogs(n) + fleteIda;
@@ -33,5 +38,5 @@ export function crearRentabilidad(ctx, costos, publicidad) {
     };
   };
 
-  return { brutoPorPedido, utilidadPorPedido, utilidadPorVentaEntregada, utilidadFinal, margen, markup, cac };
+  return { brutoPorPedido, utilidadPorPedido, utilidadPorVentaEntregada, utilidadFinal, margen, margenOperativo, markup, cac };
 }

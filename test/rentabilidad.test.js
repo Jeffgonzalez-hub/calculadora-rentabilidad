@@ -58,3 +58,21 @@ test('costo unitario 0: markup null, no divide por cero', () => {
   assert.equal(r0.markup(1, 50000).sobreProducto, null);
   assert.equal(r0.markup(1, 50000).sobreProductoYFlete, null);
 });
+
+test('margenOperativo(n,P) = utilidadPorVentaEntregada(n,P) / P', () => {
+  const rent = motor(); // usa el helper ya existente en este archivo
+  const precio = 120100;
+  const esperado = rent.utilidadPorVentaEntregada(1, precio) / precio;
+  assert.ok(Math.abs(rent.margenOperativo(1, precio) - esperado) < 1e-9);
+});
+
+test('margenOperativo: precio <= 0 -> null', () => {
+  const rent = motor();
+  assert.equal(rent.margenOperativo(1, 0), null);
+});
+
+test('margenOperativo NO depende de si hay CAC (a diferencia de margen.neto)', () => {
+  const conPauta = motor({ mercado: { costoConversacion: 4000 } });
+  const sinPauta = motor({ mercado: { costoConversacion: 0 } });
+  assert.ok(Math.abs(conPauta.margenOperativo(1, 120100) - sinPauta.margenOperativo(1, 120100)) < 1e-9);
+});
