@@ -1,75 +1,76 @@
+// test/adapter-form-a-entrada.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CAMPOS, formToEntrada } from '../ui/adapter.js';
+import { CAMPOS, formToEntrada, perfilToVista } from '../ui/adapter.js';
+import { PERFIL_DEFECTO } from '../ui/perfil.js';
 
-// Un form "vacío" = todos los campos como los deja el navegador al arrancar: el string del defecto.
 function formDefecto(over = {}) {
-  const f = { modo: 'sugerir' };
+  const f = {};
   for (const c of CAMPOS) f[c.id] = String(c.defecto ?? '');
   return { ...f, ...over };
 }
 
-test('CAMPOS: cubre los campos del spec, con grupo y modo', () => {
-  const ids = CAMPOS.map((c) => c.id);
-  for (const req of ['costoUnitario', 'utilidadObjetivo', 'precioBase', 'precio2', 'precio3',
-    'fleteIda', 'fleteDevolucion', 'tasaEntrega', 'tasaCierre', 'costoConversacion', 'presupuestoDia',
-    'comisionRecaudoPct', 'comisionRecaudoFijo', 'feeDevolucion', 'pctProductoPerdido', 'empaque',
-    'costoAtencionConv', 'cesionCombo', 'costosFijosMes', 'diasOperacionMes',
-    'mezcla1', 'mezcla2', 'mezcla3', 'redondeoGranularidad', 'redondeoTerminacion', 'redondeoDireccion']) {
-    assert.ok(ids.includes(req), `falta CAMPOS.${req}`);
-  }
-  assert.ok(CAMPOS.find((c) => c.id === 'utilidadObjetivo').modo === 'sugerir');
-  assert.ok(CAMPOS.find((c) => c.id === 'precioBase').modo === 'evaluar');
+test('CAMPOS: la vista básica son exactamente 2 campos', () => {
+  assert.equal(CAMPOS.length, 2);
+  const ids = CAMPOS.map((c) => c.id).sort();
+  assert.deepEqual(ids, ['costoUnitario', 'margenObjetivo']);
+  const margen = CAMPOS.find((c) => c.id === 'margenObjetivo');
+  assert.equal(margen.defecto, 25);
+  assert.deepEqual(margen.presets, [15, 20, 25, 30]);
 });
 
-test('moneda: distintos formatos → mismo número', () => {
-  const e = formToEntrada(formDefecto({ costoUnitario: '$37.500' }));
-  assert.equal(e.producto.costoUnitario, 37500);
-  assert.equal(formToEntrada(formDefecto({ costoUnitario: '37500' })).producto.costoUnitario, 37500);
-  assert.equal(formToEntrada(formDefecto({ costoUnitario: '37.500,50' })).producto.costoUnitario, 37500.5);
-  assert.equal(formToEntrada(formDefecto({ costoUnitario: 'abc' })).producto.costoUnitario,
-    Number(CAMPOS.find((c) => c.id === 'costoUnitario').defecto));
-});
-
-test('porcentaje: se divide entre 100', () => {
-  const e = formToEntrada(formDefecto({ tasaEntrega: '75', tasaCierre: '7,5' }));
-  assert.equal(e.mercado.tasaEntrega, 0.75);
-  assert.equal(e.mercado.tasaCierre, 0.075);
-});
-
-test('modo sugerir: precioBase null, escalera vacía, utilidadObjetivo se usa', () => {
-  const e = formToEntrada(formDefecto({ modo: 'sugerir', utilidadObjetivo: '40000' }));
-  assert.equal(e.producto.precioBase, null);
-  assert.deepEqual(e.producto.escaleraPrecios, []);
+test('formToEntrada: costo lleno -> procedencia.costoUnitario REAL; regla margen_neto con el margen en fracción', () => {
+  const e = formToEntrada(formDefecto({ costoUnitario: '24000', margenObjetivo: '25' }), PERFIL_DEFECTO);
+  assert.equal(e.producto.costoUnitario, 24000);
   assert.equal(e.objetivo.modo, 'sugerir');
-  assert.equal(e.objetivo.utilidadObjetivo, 40000);
+  assert.deepEqual(e.objetivo.regla, { tipo: 'margen_neto', valor: 0.25 });
+  assert.equal(e.procedencia.costoUnitario, 'REAL');
+  assert.equal(e.procedencia['objetivo.regla.valor'], 'CONFIG');
 });
 
-test('modo evaluar: precioBase + escalera de las filas con precio', () => {
-  const e = formToEntrada(formDefecto({ modo: 'evaluar', precioBase: '119900', precio2: '198900', precio3: '' }));
-  assert.equal(e.objetivo.modo, 'evaluar');
-  assert.equal(e.producto.precioBase, 119900);
-  assert.deepEqual(e.producto.escaleraPrecios, [{ cantidad: 2, precio: 198900 }]);
+test('formToEntrada: costo vacío -> costoUnitario null y procedencia FALTANTE (no 0)', () => {
+  const e = formToEntrada(formDefecto({ costoUnitario: '' }), PERFIL_DEFECTO);
+  assert.equal(e.producto.costoUnitario, null);
+  assert.equal(e.procedencia.costoUnitario, 'FALTANTE');
 });
 
-test('mezcla: los 3 campos, sin dividir', () => {
-  const e = formToEntrada(formDefecto({ mezcla1: '50', mezcla2: '30', mezcla3: '20' }));
-  assert.deepEqual(e.mezcla, { 1: 50, 2: 30, 3: 20 });
+test('formToEntrada: margen vacío -> regla.valor null (el motor lo resuelve como sin_objetivo)', () => {
+  const e = formToEntrada(formDefecto({ costoUnitario: '24000', margenObjetivo: '' }), PERFIL_DEFECTO);
+  assert.equal(e.objetivo.regla.valor, null);
+  assert.equal(e.objetivo.regla.tipo, 'margen_neto');
 });
 
-test('redondeoDireccion inválida → arriba', () => {
-  const e = formToEntrada(formDefecto({ redondeoDireccion: 'lateral' }));
-  assert.equal(e.supuestos.redondeo.direccion, 'arriba');
+test('formToEntrada: el perfil entra tal cual (valores + procedencia) sin recalcular', () => {
+  const perfil = { ...JSON.parse(JSON.stringify(PERFIL_DEFECTO)), comisionRecaudoPct: { valor: 0.05, estado: 'REAL' } };
+  const e = formToEntrada(formDefecto({ costoUnitario: '24000' }), perfil);
+  assert.equal(e.supuestos.fleteIda, 20000);
+  assert.equal(e.supuestos.fleteDevolucion, null);
+  assert.equal(e.supuestos.comisionRecaudoPct, 0.05);
+  assert.equal(e.mercado.tasaEntrega, 0.75);
+  assert.equal(e.overhead.diasOperacionMes, 30);
+  assert.equal(e.procedencia.fleteIda, 'SUPUESTO');
+  assert.equal(e.procedencia.comisionRecaudoPct, 'REAL');
+  assert.equal(e.procedencia.fleteDevolucion, 'FALTANTE');
 });
 
-test('avanzado: comisión %/fijo, empaque, fijos, días — mapean al lugar correcto', () => {
-  const e = formToEntrada(formDefecto({
-    comisionRecaudoPct: '3', comisionRecaudoFijo: '1500', empaque: '800',
-    costosFijosMes: '3000000', diasOperacionMes: '26',
-  }));
-  assert.equal(e.supuestos.comisionRecaudoPct, 0.03);
-  assert.equal(e.supuestos.comisionRecaudoFijo, 1500);
-  assert.equal(e.supuestos.empaquePorPedido, 800);
-  assert.equal(e.overhead.costosFijosMes, 3000000);
-  assert.equal(e.overhead.diasOperacionMes, 26);
+test('formToEntrada: nunca manda objetivo.utilidadObjetivo (campo muerto de V1)', () => {
+  const e = formToEntrada(formDefecto({ costoUnitario: '24000' }), PERFIL_DEFECTO);
+  assert.equal('utilidadObjetivo' in e.objetivo, false);
+});
+
+test('perfilToVista: cuenta de confianza + filas por clave + lista de prioridades', () => {
+  const v = perfilToVista(PERFIL_DEFECTO);
+  assert.deepEqual(v.confianza, { real: 0, supuesto: 5, falta: 8 });
+  assert.equal(v.filas.length, Object.keys(PERFIL_DEFECTO).length);
+  const flete = v.filas.find((f) => f.clave === 'fleteIda');
+  assert.equal(flete.estado, 'SUPUESTO');
+  assert.equal(flete.titulo, 'Flete de ida');
+  assert.ok(flete.ayuda.length > 0);
+  assert.match(flete.valorTexto, /20\.000/);      // formateado
+  const faltante = v.filas.find((f) => f.clave === 'comisionRecaudoPct');
+  assert.equal(faltante.valorTexto, '');           // FALTANTE -> input vacío, nunca "$0"
+  // prioridades: solo FALTANTE, ordenadas por PRIORIDADES, con etiqueta de impacto
+  assert.ok(v.prioridades.length >= 3);
+  assert.ok(v.prioridades.every((p) => p.estado === 'FALTANTE'));
+  assert.equal(v.prioridades[0].clave, 'comisionRecaudoPct');
 });
