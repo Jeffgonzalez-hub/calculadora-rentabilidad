@@ -1,3 +1,4 @@
+// src/combos.js
 import { redondear } from './redondeo.js';
 import { aviso } from './util.js';
 
@@ -12,14 +13,40 @@ export function crearCombos(ctx, costos, rent) {
   const {
     objetivo, cesionUtilidadPorUnidadExtra: d, comisionRecaudoPct,
     comisionRecaudoFijo, fleteIda, empaquePorPedido, redondeo,
-    escaleraPrecios, precioBase,
+    escaleraPrecios, precioBase, costoUnitario,
   } = ctx;
 
-  const utotal = (n) => objetivo.utilidadObjetivo * (1 + (n - 1) * (1 - d));
+  const regla = objetivo.regla ?? { tipo: 'margen_neto', valor: 0.25 };
 
-  const precioCrudo = (n) =>
+  // K0(n) = cogs(n) + fleteIda + comisiónFija(Q) + empaque(E) + colchón(n) —
+  // "recuperación de costos por venta entregada", sin precio y sin adquisición (§A.6).
+  const K0 = (n) => costos.cogs(n) + fleteIda + comisionRecaudoFijo + empaquePorPedido + costos.colchonDevoluciones(n);
+
+  // --- regla margen_neto (default V2): P_crudo = (K0(n)+cac) / (1-q-m), o K0(n)/(1-q-m) sin CAC. ---
+  const precioCrudoMargenNeto = (n) => {
+    const m = regla.valor;
+    if (m == null) return null; // sin_objetivo: index.js/recomendacion.js lo maneja aparte
+    const denominador = 1 - comisionRecaudoPct - m;
+    if (denominador <= 0) return null; // no_alcanzable — nunca Infinity/negativo
+    const cac = rent.cac;
+    const numerador = cac == null ? K0(n) : K0(n) + cac;
+    return numerador / denominador;
+  };
+
+  // --- regla utilidad_fija (mecanismo histórico de V1: "quiero ganar $U por venta entregada"). ---
+  const utotalFija = (n) => regla.valor * (1 + (n - 1) * (1 - d));
+  const precioCrudoUtilidadFija = (n) =>
     (costos.cogs(n) + fleteIda + comisionRecaudoFijo + empaquePorPedido
-      + costos.colchonDevoluciones(n) + utotal(n)) / (1 - comisionRecaudoPct);
+      + costos.colchonDevoluciones(n) + utotalFija(n)) / (1 - comisionRecaudoPct);
+
+  // --- regla markup: referencia rápida, ignora flete/devoluciones/CAC (§A.10). ---
+  const precioCrudoMarkup = (n) => costoUnitario * n * regla.valor;
+
+  const precioCrudo = (n) => {
+    if (regla.tipo === 'utilidad_fija') return precioCrudoUtilidadFija(n);
+    if (regla.tipo === 'markup') return precioCrudoMarkup(n);
+    return precioCrudoMargenNeto(n);
+  };
 
   const sugerirPrecioCombo = (n) => redondear(precioCrudo(n), redondeo);
 
@@ -30,7 +57,6 @@ export function crearCombos(ctx, costos, rent) {
     const pct = margenNeto * 100;
     const hit = UMBRALES.find((u) => margenNeto >= u.min);
     if (hit) return { nivel: hit.nivel, pct };
-    // pct > 0 => 'muy-apretado'; exactamente 0 o negativo => 'pierde'
     return { nivel: margenNeto > 0 ? 'muy-apretado' : 'pierde', pct };
   };
 
@@ -39,8 +65,6 @@ export function crearCombos(ctx, costos, rent) {
     let ingreso;
     let esSugerido = false;
     const fila = filaEscalera(n);
-    // Se calcula SIEMPRE (también cuando la escalera fija el precio) para que Fase 3
-    // pueda comparar el precio de catálogo contra el que sugiere el motor.
     const precioSugerido = sugerirPrecioCombo(n);
 
     if (objetivo.modo === 'sugerir') {
@@ -78,8 +102,8 @@ export function crearCombos(ctx, costos, rent) {
       margen,
       markup: rent.markup(n, ingreso),
       cac,
-      roas: null,               // lo completa index.js
-      descuentoMaximoPct: null, // lo completa index.js
+      roas: null,
+      descuentoMaximoPct: null,
       semaforo: semaforoDe(margen.neto),
     };
     return { combo, avisos };
