@@ -63,6 +63,7 @@ export function construirRecomendacion(ctx, procedencia, combo1, rent, publicida
     precioCrudo: precioCrudoDe1,
     tipoMargen, margenObjetivo, margenLogrado,
     utilidadPorVentaEntregada: combo1.utilidad.porVentaEntregada,
+    utilidadNeta: rent.utilidadFinal(1, combo1.ingreso),   // number, or null when there's no CAC (bruto)
     confianza: { supuestos, faltantesAsumidosCero, cacDisponible },
     avisos: avisosRec,
   };

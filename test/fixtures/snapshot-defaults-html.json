@@ -236,6 +236,7 @@
     "margenObjetivo": null,
     "margenLogrado": 0.14,
     "utilidadPorVentaEntregada": 40933.33,
+    "utilidadNeta": 14266.67,
     "confianza": {
       "supuestos": [
         "costoUnitario",

@@ -59,6 +59,8 @@ test('estimacion_neto: CAC disponible + al menos un supuesto -> estimación, tip
   assert.equal(r.confianza.cacDisponible, true);
   assert.ok(r.precio > 0);
   assert.ok(r.confianza.supuestos.length > 0 || r.confianza.faltantesAsumidosCero.length > 0);
+  // §B.3: el hero neto muestra la utilidad neta de adquisición (por debajo de la bruta)
+  assert.ok(r.utilidadNeta != null && r.utilidadNeta < r.utilidadPorVentaEntregada);
 });
 
 test('ok_neto: TODO marcado REAL explícitamente + CAC disponible -> sin estimación', () => {
@@ -89,6 +91,7 @@ test('estimacion_bruto: sin CAC (costoConversacion=0) -> tipoMargen operativo', 
   assert.equal(r.confianza.cacDisponible, false);
   assert.equal(r.margenLogrado, r.margenLogrado); // no NaN
   assert.ok(r.precio > 0);
+  assert.equal(r.utilidadNeta, null); // sin CAC no hay utilidad neta de adquisición
 });
 
 test('margen objetivo 0%: estado válido, aviso "margen_cero" informativo', () => {

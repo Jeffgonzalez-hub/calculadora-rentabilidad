@@ -156,8 +156,9 @@ export function recomendacionToVista(resultado) {
     ? `Margen ${rec.tipoMargen} objetivo ${pct(rec.margenObjetivo ?? 0, 0)} → logrado ${oGuion(rec.margenLogrado, (x) => '≈ ' + pct(x, 1))}`
     : '';
   const lineaUtilidad = muestraPrecio
-    ? `Utilidad ${rec.tipoMargen === 'operativo' ? 'operativa ' : ''}estimada por venta entregada ${oGuion(rec.utilidadPorVentaEntregada, (x) => '≈ ' + pesos(x))}`
-      + (rec.tipoMargen === 'operativo' ? ' — sin restar publicidad' : '')
+    ? (rec.tipoMargen === 'neto'
+        ? `Utilidad neta estimada por venta entregada ${oGuion(rec.utilidadNeta, (x) => '≈ ' + pesos(x))}`
+        : `Utilidad operativa estimada por venta entregada ${oGuion(rec.utilidadPorVentaEntregada, (x) => '≈ ' + pesos(x))} — sin restar publicidad`)
     : '';
 
   return {
