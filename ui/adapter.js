@@ -198,50 +198,17 @@ function vistaAvisos(avisos) {
   return { lista, resumen };
 }
 
-function vistaVeredicto(r) {
-  const c1 = r.combos[0];
-  const mejor = r.combos.find((c) => c.n === r.mejorCombo.n) || c1;
-  const sinPauta = c1.utilidad.final == null;
-  const gana = !sinPauta && r.combos.some((c) => c.utilidad.final > 0);
-  const estado = sinPauta ? 'sin-pauta' : gana ? 'gana' : 'pierde';
-  const tope = r.equilibrio.costoConversacionMaximo;
-  const actualCC = r.entradaNormalizada.mercado.costoConversacion;
-  const holgura = tope == null ? null : tope - actualCC;
-
-  const lineas = sinPauta
-    ? ['Cargá el costo por conversación para ver si la campaña te sirve.']
-    : [
-        `Ganás ${oGuion(mejor.utilidad.final, pesos)} limpios por venta entregada (combo de ${mejor.n}u).`,
-        `Mejor combo: ${mejor.n} unidad${mejor.n > 1 ? 'es' : ''} · ${pesos(mejor.ingreso)} · margen neto ${oGuion(mejor.margen.neto, pctFr)}.`,
-        tope == null
-          ? 'No se puede estimar el tope por conversación con estos datos.'
-          : `Podés pagar hasta ${pesos(tope)} por conversación (hoy pagás ${pesos(actualCC)}).`,
-      ];
-
-  return {
-    estado,
-    titulo: sinPauta ? 'FALTAN DATOS DE PAUTA' : gana ? 'SÍ, VAS GANANDO' : 'NO, VAS PERDIENDO',
-    clase: sinPauta ? 'ver-neutro' : gana ? 'ver-gana' : 'ver-pierde',
-    gananciaLimpia: oGuion(mejor.utilidad.final, pesos),
-    gananciaComboN: mejor.n,
-    mejorCombo: { n: mejor.n, precio: pesos(mejor.ingreso), margenPct: oGuion(mejor.margen.neto, pctFr) },
-    topeConversacion: oGuion(tope, pesos),
-    costoConversacionActual: pesos(actualCC),
-    holguraConversacion: holgura == null ? '—' : pesos(holgura),
-    lineas,
-  };
-}
-
-function vistaCombos(r, modo) {
+function vistaCombos(r) {
   return r.combos.map((c) => ({
     n: c.n,
     titulo: `${c.n} unidad${c.n > 1 ? 'es' : ''}`,
     esMejor: c.n === r.mejorCombo.n,
     precio: pesos(c.ingreso),
     precioRaw: c.ingreso,
+    precioUnidad: pesos(c.ingreso / c.n),
     esSugerido: c.esSugerido,
     precioSugerido: pesos(c.precioSugerido),
-    editable: modo === 'evaluar',
+    editable: false,
     gana: oGuion(c.utilidad.final, pesos),
     margenNeto: oGuion(c.margen.neto, pctFr),
     margenBruto: oGuion(c.margen.bruto, pctFr),
@@ -321,8 +288,10 @@ function vistaEquilibrio(r) {
   const ing1 = r.combos[0].ingreso;
   // El motor devuelve 0 (no null) cuando no hay costos fijos: sin fijos no hay meta de unidades → "—".
   const uFijos = eq.unidadesDiaParaFijos;
+  const pmo1 = (r.equilibrio.precioMinimoOperativo ?? []).find((p) => p.n === 1)?.valor ?? null;
   const filas = [
-    filaEquilibrio('precioMinimo', 'Precio mínimo (1u)', eq.precioMinimo[0]?.valor, ing1, 'moneda', 'min'),
+    filaEquilibrio('precioMinimoOperativo', 'Precio mínimo operativo (1u)', pmo1, ing1, 'moneda', 'min'),
+    filaEquilibrio('precioMinimo', 'Precio mínimo con CAC (1u)', r.equilibrio.precioMinimo[0]?.valor, ing1, 'moneda', 'min'),
     filaEquilibrio('entregaMinima', 'Entrega mínima', eq.tasaEntregaMinima, m.tasaEntrega, 'pct', 'min'),
     filaEquilibrio('cierreMinimo', 'Cierre mínimo', eq.tasaCierreMinima, m.tasaCierre, 'pct', 'min'),
     filaEquilibrio('costoConvMax', 'Costo/conversación máx', eq.costoConversacionMaximo, m.costoConversacion, 'moneda', 'max'),
@@ -330,9 +299,9 @@ function vistaEquilibrio(r) {
     filaEquilibrio('unidadesDiaFijos', 'Unidades/día para fijos', uFijos > 0 ? uFijos : null, null, 'numero', 'min'),
   ];
   // etiqueta de actual más específica
-  filas[0].actualLabel = 'vendés a';
-  filas[1].actualLabel = filas[2].actualLabel = 'tu tasa';
-  filas[4].actualLabel = 'tu ROAS';
+  filas[0].actualLabel = filas[1].actualLabel = 'vendés a';
+  filas[2].actualLabel = filas[3].actualLabel = 'tu tasa';
+  filas[5].actualLabel = 'tu ROAS';
   return filas;
 }
 
@@ -358,14 +327,13 @@ function vistaProyeccion(r) {
   };
 }
 
-export function resultadoToVista(resultado, modo, comboSeleccionado = 1) {
+export function resultadoToVista(resultado, comboSeleccionado = 1) {
   const av = vistaAvisos(resultado.avisos);
   return {
-    meta: { modo, comboSeleccionado },
-    veredicto: vistaVeredicto(resultado),
+    meta: { comboSeleccionado },
     avisos: av.lista,
     resumenAvisos: av.resumen,
-    combos: vistaCombos(resultado, modo),
+    combos: vistaCombos(resultado),
     desglose: vistaDesglose(resultado, comboSeleccionado),
     equilibrio: vistaEquilibrio(resultado),
     proyeccion: vistaProyeccion(resultado),
@@ -492,18 +460,19 @@ function vistaEscenarios(esc) {
 
 // --- Funciones públicas ---
 
-export function analizarDesdeFormulario(form, comboSeleccionado = 1) {
-  const entrada = formToEntrada(form);
+export function analizarDesdeFormulario(form, perfil, comboSeleccionado = 1) {
+  const entrada = formToEntrada(form, perfil);
   const resultado = analizar(entrada, { conEscenarios: false });
   return {
-    vista: resultadoToVista(resultado, entrada.objetivo.modo, comboSeleccionado),
+    vista: resultadoToVista(resultado, comboSeleccionado),
+    hero: recomendacionToVista(resultado),
     entradaNormalizada: resultado.entradaNormalizada,
     avisos: resultado.avisos,
   };
 }
 
-export function escenariosDesdeFormulario(form) {
-  const entrada = formToEntrada(form);
+export function escenariosDesdeFormulario(form, perfil) {
+  const entrada = formToEntrada(form, perfil);
   const resultado = analizar(entrada, { conEscenarios: true });
   return vistaEscenarios(resultado.escenarios);
 }

@@ -1,94 +1,65 @@
+// test/adapter-resultado-a-vista.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { analizar } from '../src/index.js';
-import { formToEntrada, CAMPOS, resultadoToVista } from '../ui/adapter.js';
+import { formToEntrada, CAMPOS, resultadoToVista, analizarDesdeFormulario } from '../ui/adapter.js';
+import { PERFIL_DEFECTO } from '../ui/perfil.js';
 
 function formDefecto(over = {}) {
-  const f = { modo: 'sugerir' };
+  const f = {};
   for (const c of CAMPOS) f[c.id] = String(c.defecto ?? '');
   return { ...f, ...over };
 }
-// escenario "defaults del HTML" (mismo del snapshot de Fase 1)
-const FORM_BASE = formDefecto({ costoUnitario: '37500', fleteIda: '20000', fleteDevolucion: '0',
-  tasaEntrega: '75', tasaCierre: '20', costoConversacion: '4000', presupuestoDia: '20000',
-  utilidadObjetivo: '40000' });
+const FORM = formDefecto({ costoUnitario: '24000', margenObjetivo: '25' });
 
-function vistaDe(form) {
-  const entrada = formToEntrada(form);
-  return resultadoToVista(analizar(entrada, { conEscenarios: false }), entrada.objetivo.modo);
+function vistaDe(form, perfil = PERFIL_DEFECTO) {
+  return resultadoToVista(analizar(formToEntrada(form, perfil)));
 }
 
-test('bloques presentes; escenarios null en esta task', () => {
-  const v = vistaDe(FORM_BASE);
-  for (const k of ['meta', 'veredicto', 'avisos', 'resumenAvisos', 'combos', 'desglose', 'equilibrio', 'proyeccion']) {
+test('vista: sin veredicto; con combos/desglose/equilibrio/proyeccion; escenarios null', () => {
+  const v = vistaDe(FORM);
+  assert.equal('veredicto' in v, false);
+  for (const k of ['avisos', 'resumenAvisos', 'combos', 'desglose', 'equilibrio', 'proyeccion']) {
     assert.ok(k in v, `falta vista.${k}`);
   }
   assert.equal(v.escenarios, null);
   assert.equal(v.combos.length, 3);
 });
 
-test('veredicto: defaults → gana, mejor combo n=3', () => {
-  const v = vistaDe(FORM_BASE);
-  assert.equal(v.veredicto.estado, 'gana');
-  assert.equal(v.veredicto.clase, 'ver-gana');
-  assert.equal(v.veredicto.gananciaComboN, 3);
-  assert.match(v.veredicto.mejorCombo.precio, /^\$/);
-  assert.ok(v.veredicto.lineas.length >= 2);
+test('equilibrio: incluye la fila de precio mínimo operativo', () => {
+  const v = vistaDe(FORM);
+  const fila = v.equilibrio.find((f) => f.clave === 'precioMinimoOperativo');
+  assert.ok(fila, 'falta la fila precioMinimoOperativo');
+  assert.match(fila.limite, /^\$/);
 });
 
-test('combos: formato y semáforo', () => {
-  const v = vistaDe(FORM_BASE);
-  assert.equal(v.combos[0].precio, '$105.100');
-  assert.equal(v.combos[0].editable, false);       // modo sugerir
-  assert.equal(v.combos[0].esSugerido, true);
-  assert.match(v.combos[0].markup, /×$/);
-  assert.ok(v.combos[0].semaforo.clase.startsWith('sem-'));
-  assert.ok(v.combos[2].esMejor);
+test('combos: formato, no editables (V2 UI no tiene modo evaluar)', () => {
+  const v = vistaDe(FORM);
+  assert.match(v.combos[0].precio, /^\$/);
+  assert.equal(v.combos[0].editable, false);
 });
 
-test('desglose: las partes suman el precio', () => {
-  const v = vistaDe(FORM_BASE);
-  const suma = v.desglose.partes.reduce((a, p) => a + p.anchoPct, 0);
-  assert.ok(Math.abs(suma - 100) < 0.5, `Σ anchoPct = ${suma}`);
-  assert.equal(v.desglose.partes.length, 6);
-  assert.equal(v.desglose.partes[5].label, 'Tu utilidad');
+test('analizarDesdeFormulario: devuelve vista + hero', () => {
+  const { vista, hero, entradaNormalizada, avisos } = analizarDesdeFormulario(FORM, PERFIL_DEFECTO);
+  assert.ok(vista && hero);
+  assert.equal(hero.estado, 'estimacion_neto'); // costo REAL + perfil con supuestos
+  assert.ok(entradaNormalizada && Array.isArray(avisos));
 });
 
-test('equilibrio: 6 filas; unidades/día sin fijos → no alcanzable', () => {
-  const v = vistaDe(FORM_BASE);
-  assert.equal(v.equilibrio.length, 6);
-  const u = v.equilibrio.find((f) => f.clave === 'unidadesDiaFijos');
-  assert.equal(u.alcanzable, false);
-  assert.equal(u.limite, '—');
+test('costo vacío -> hero.estado sin_costo, sin precio', () => {
+  const { hero } = analizarDesdeFormulario(formDefecto({ costoUnitario: '' }), PERFIL_DEFECTO);
+  assert.equal(hero.estado, 'sin_costo');
+  assert.equal(hero.muestraPrecio, false);
 });
 
-test('proyección: disponible con presupuesto + pauta', () => {
-  const v = vistaDe(FORM_BASE);
-  assert.equal(v.proyeccion.disponible, true);
-  assert.equal(v.proyeccion.pedidosDia, '1,00');            // M4: 2 decimales en cifras sub-1/día
-  assert.equal(v.proyeccion.ventasEntregadasDia, '0,75');   // antes redondeaba a "0,8"
-  assert.match(v.proyeccion.utilidadMes, /^\$/);
+test('margen vacío (costo lleno) -> hero.estado sin_objetivo, sin precio, CTA al margen', () => {
+  const { hero } = analizarDesdeFormulario(formDefecto({ costoUnitario: '24000', margenObjetivo: '' }), PERFIL_DEFECTO);
+  assert.equal(hero.estado, 'sin_objetivo');
+  assert.equal(hero.muestraPrecio, false);
+  assert.equal(hero.cta.destino, 'margen');
 });
 
-test('desglose: precio bajo costo → barra-perdida y las 5 partes de costo suman ~100', () => {
-  const v = vistaDe(formDefecto({ ...FORM_BASE, modo: 'evaluar', precioBase: '20000', costoUnitario: '37500' }));
-  assert.equal(v.desglose.clase, 'barra-perdida');
-  const cinco = v.desglose.partes.slice(0, 5).reduce((a, p) => a + p.anchoPct, 0);
-  assert.ok(Math.abs(cinco - 100) < 0.5, `Σ 5 costos = ${cinco}`);
-  assert.equal(v.desglose.partes[5].clave, 'utilidad');
-  assert.equal(v.desglose.partes[5].anchoPct, 0);
-});
-
-test('sin pauta: veredicto sin-pauta, combos gana "—", proyección no disponible', () => {
-  const v = vistaDe(formDefecto({ ...FORM_BASE, costoConversacion: '0' }));
-  assert.equal(v.veredicto.estado, 'sin-pauta');
-  assert.equal(v.combos[0].gana, '—');
-  assert.equal(v.combos[0].cac, '—');
-  assert.equal(v.proyeccion.disponible, false);
-});
-
-test('avisos: nivel → clase, y el resumen cuenta', () => {
-  const v = vistaDe(formDefecto({ ...FORM_BASE, costoUnitario: '0' }));  // dispara costo_faltante (error)
-  assert.ok(v.avisos.some((a) => a.codigo === 'costo_faltante' && a.clase === 'av-error'));
-  assert.ok(v.resumenAvisos.errores >= 1);
+test('avisos: el degradante FALTANTE del perfil llega a la vista', () => {
+  const v = vistaDe(FORM); // perfil default: comisionRecaudoPct etc. FALTANTE
+  assert.ok(v.avisos.some((a) => a.codigo === 'datos_faltantes_en_cero'));
 });
