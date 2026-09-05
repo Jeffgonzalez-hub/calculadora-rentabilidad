@@ -1,4 +1,5 @@
 import { num, clamp, aviso } from './util.js';
+import { inferirProcedencia } from './procedencia.js';
 
 const PISO_TASA = 0.01;
 
@@ -72,6 +73,13 @@ export function normalizarEntrada(entrada = {}) {
     ? obj.modo
     : (precioBase == null ? 'sugerir' : 'evaluar');
 
+  const TIPOS_REGLA = new Set(['margen_neto', 'utilidad_fija', 'markup']);
+  const reglaCruda = obj.regla ?? {};
+  const regla = {
+    tipo: TIPOS_REGLA.has(reglaCruda.tipo) ? reglaCruda.tipo : 'margen_neto',
+    valor: reglaCruda.valor === null ? null : num(reglaCruda.valor, 0.25),
+  };
+
   const ctx = {
     costoUnitario, precioBase, escaleraPrecios,
     fleteIda: num(s.fleteIda), fleteDevolucion: num(s.fleteDevolucion), feeDevolucion: num(s.feeDevolucion),
@@ -92,7 +100,7 @@ export function normalizarEntrada(entrada = {}) {
     costosFijosMes: num(ov.costosFijosMes, 0),
     diasOperacionMes: Math.max(1, num(ov.diasOperacionMes, 30)),
     mezcla,
-    objetivo: { modo, utilidadObjetivo: num(obj.utilidadObjetivo, 0) },
+    objetivo: { modo, regla },
   };
 
   const entradaNormalizada = {
@@ -110,5 +118,6 @@ export function normalizarEntrada(entrada = {}) {
     mezcla, objetivo: ctx.objetivo,
   };
 
-  return { ctx, entradaNormalizada, avisos };
+  const procedencia = inferirProcedencia(entrada);
+  return { ctx, entradaNormalizada, avisos, procedencia };
 }

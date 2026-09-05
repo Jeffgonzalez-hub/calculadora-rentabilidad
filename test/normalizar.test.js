@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizarEntrada } from '../src/normalizar.js';
+import { inferirProcedencia } from '../src/procedencia.js';
 
 test('aplica defaults cuando la entrada está casi vacía', () => {
   const { ctx } = normalizarEntrada({ producto: { costoUnitario: 37500 }, objetivo: { modo: 'sugerir', utilidadObjetivo: 40000 } });
@@ -66,4 +67,45 @@ test('acota redondeo.terminacion a [0, granularidad - 1]', () => {
   assert.equal(ctx.redondeo.granularidad, 1000);
   assert.ok(ctx.redondeo.terminacion < ctx.redondeo.granularidad);
   assert.equal(ctx.redondeo.terminacion, 999);
+});
+
+test('normalizarEntrada devuelve procedencia (misma inferencia que inferirProcedencia)', () => {
+  const entrada = { producto: { costoUnitario: 24000 }, supuestos: { fleteIda: null } };
+  const { procedencia } = normalizarEntrada(entrada);
+  assert.deepEqual(procedencia, inferirProcedencia(entrada));
+  assert.equal(procedencia.fleteIda, 'FALTANTE');
+});
+
+test('objetivo.regla: default margen_neto 0.25 cuando no se especifica', () => {
+  const { ctx } = normalizarEntrada({ producto: { costoUnitario: 24000 } });
+  assert.deepEqual(ctx.objetivo.regla, { tipo: 'margen_neto', valor: 0.25 });
+});
+
+test('objetivo.regla: se respeta un tipo/valor explícito', () => {
+  const { ctx } = normalizarEntrada({
+    producto: { costoUnitario: 24000 },
+    objetivo: { regla: { tipo: 'utilidad_fija', valor: 40000 } },
+  });
+  assert.deepEqual(ctx.objetivo.regla, { tipo: 'utilidad_fija', valor: 40000 });
+});
+
+test('objetivo.regla: valor null explícito se conserva (dispara sin_objetivo más adelante)', () => {
+  const { ctx } = normalizarEntrada({
+    producto: { costoUnitario: 24000 },
+    objetivo: { regla: { tipo: 'margen_neto', valor: null } },
+  });
+  assert.equal(ctx.objetivo.regla.valor, null);
+});
+
+test('objetivo.regla: tipo desconocido cae a margen_neto', () => {
+  const { ctx } = normalizarEntrada({
+    producto: { costoUnitario: 24000 },
+    objetivo: { regla: { tipo: 'inventado', valor: 0.3 } },
+  });
+  assert.equal(ctx.objetivo.regla.tipo, 'margen_neto');
+});
+
+test('entradaNormalizada.objetivo también trae regla (no solo ctx)', () => {
+  const { entradaNormalizada } = normalizarEntrada({ producto: { costoUnitario: 24000 } });
+  assert.deepEqual(entradaNormalizada.objetivo.regla, { tipo: 'margen_neto', valor: 0.25 });
 });
