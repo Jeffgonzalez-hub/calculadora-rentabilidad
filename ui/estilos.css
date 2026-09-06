@@ -1,24 +1,28 @@
+/* Paleta alineada con JDSMPlus Taller (taller.jdsmplus.co).
+   Neutros claros + acento de marca #1160F7. La semántica de confianza
+   (REAL / SUPUESTO / FALTANTE / CONFIG) se mantiene distinguible por color
+   propio, no por el acento. */
 :root{
-  --fondo:#FAF5F0; --superficie:#FFFFFF; --superficie-2:#F1EAE0;
-  --borde:#E3D8C8; --borde-suave:#ECE3D6;
-  --tinta:#26302A; --tinta-suave:#5C6459; --tinta-tenue:#8A9086;
-  --acento:#3D5340; --acento-suave:#E7EDE4; --acento-2:#C3CCA6;
+  --fondo:#F7F8FA; --superficie:#FFFFFF; --superficie-2:#EFF2F7;
+  --borde:#E3E7EE; --borde-suave:#EDF0F5;
+  --tinta:#141925; --tinta-suave:#4C5566; --tinta-tenue:#7A8496;
+  --acento:#1160F7; --acento-suave:#E7EEFE; --acento-2:#7FB2FF;
 
-  --real:#3D5340; --real-bg:#E7EDE4;
-  --supuesto:#A6712A; --supuesto-bg:#F5E8D3;
-  --falta:#AE4736; --falta-bg:#F7E1DA;
-  --config:#54608A; --config-bg:#E6E7F2;
+  --real:#0E7C55; --real-bg:#E3F3EC;
+  --supuesto:#9A6B1E; --supuesto-bg:#F6EAD4;
+  --falta:#B23B2E; --falta-bg:#F8E3DF;
+  --config:#5B54A8; --config-bg:#EAE8F6;
 
-  --ok:var(--acento); --ok-bg:var(--acento-suave);
+  --ok:var(--real); --ok-bg:var(--real-bg);
   --warn:var(--supuesto); --warn-bg:var(--supuesto-bg);
   --mal:var(--falta); --mal-bg:var(--falta-bg);
 
   --r-card:16px; --r-input:10px;
-  --sombra:0 1px 2px rgba(38,48,42,.04), 0 8px 24px -12px rgba(38,48,42,.18);
-  --sans:'Work Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --sombra:0 1px 2px rgba(16,24,40,.05), 0 24px 50px -32px rgba(16,24,40,.20);
+  --sans:'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   --display:'Fraunces', Georgia, 'Times New Roman', serif;
   --mono:'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --part-1:#CBD3B7; --part-2:#B4BE97; --part-3:#9CAA79; --part-4:#7E9060; --part-5:#5E7147; --part-6:var(--acento);
+  --part-1:#CBD9F6; --part-2:#A9C4F2; --part-3:#86AEEE; --part-4:#5E92E9; --part-5:#3B78E4; --part-6:var(--acento);
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--fondo);color:var(--tinta);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
@@ -26,7 +30,9 @@ h1,h2,h3,h4{font-family:var(--display);margin:0;text-wrap:balance}
 .num,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 :focus-visible{outline:2px solid var(--acento);outline-offset:2px;border-radius:4px}
 
-.app{max-width:860px;margin:0 auto;padding:32px 20px 80px}
+/* Fondo 3D ambiental (mismo elemento que el hub). Detrás de todo, muy sutil. */
+#fondo3d{position:fixed;inset:0;z-index:0;display:block;pointer-events:none}
+.app{max-width:860px;margin:0 auto;padding:32px 20px 80px;position:relative;z-index:1}
 .topbar{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:8px}
 .topbar h1{font-size:22px;font-weight:600}
 .topbar .sub{color:var(--tinta-tenue);font-size:12px;font-family:var(--mono)}

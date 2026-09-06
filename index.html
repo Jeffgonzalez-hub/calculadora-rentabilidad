@@ -6,10 +6,11 @@
   <title>Precio con confianza · contraentrega</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="ui/estilos.css">
 </head>
 <body>
+  <canvas id="fondo3d" aria-hidden="true"></canvas>
   <main class="app">
     <div class="topbar">
       <h1>Precio con confianza</h1>
@@ -28,5 +29,85 @@
   <div id="perfil-pantalla"></div>
 
   <script type="module" src="ui/app.js"></script>
+
+  <!-- Fondo 3D ambiental (mismo elemento del hub JDSMPlus Taller). Degrada solo si no carga. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    (function () {
+      var cvs = document.getElementById('fondo3d');
+      if (!cvs || !window.THREE) return;
+      var THREE = window.THREE;
+      var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      var renderer;
+      try { renderer = new THREE.WebGLRenderer({ canvas: cvs, antialias: true, alpha: true }); }
+      catch (e) { return; }
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight, false);
+
+      var scene = new THREE.Scene();
+      var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.set(0, 0, 9);
+
+      var grupo = new THREE.Group();
+      grupo.position.set(3.6, 0.4, -1.6);
+      scene.add(grupo);
+      grupo.add(new THREE.Mesh(
+        new THREE.IcosahedronGeometry(2.2, 1),
+        new THREE.MeshStandardMaterial({ color: 0xE4E8EF, roughness: 0.9, metalness: 0.05, flatShading: true, transparent: true, opacity: 0.32 })
+      ));
+      grupo.add(new THREE.LineSegments(
+        new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(3.1, 1)),
+        new THREE.LineBasicMaterial({ color: 0x1160f7, transparent: true, opacity: 0.06 })
+      ));
+
+      scene.add(new THREE.HemisphereLight(0xffffff, 0xd7dce6, 1.0));
+      var key = new THREE.DirectionalLight(0xffffff, 1.1);
+      key.position.set(-3, 4, 5);
+      scene.add(key);
+      var rim = new THREE.DirectionalLight(0x1160f7, 0.4);
+      rim.position.set(4, -1, -3);
+      scene.add(rim);
+
+      var mx = 0, my = 0, tx = 0, ty = 0;
+      window.addEventListener('pointermove', function (e) {
+        tx = e.clientX / window.innerWidth - 0.5;
+        ty = e.clientY / window.innerHeight - 0.5;
+      }, { passive: true });
+      window.addEventListener('resize', function () {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight, false);
+      });
+
+      var raf = 0, t0 = performance.now();
+      function frame(now) {
+        var dt = Math.min((now - t0) / 1000, 0.05);
+        t0 = now;
+        mx += (tx - mx) * 0.04;
+        my += (ty - my) * 0.04;
+        grupo.rotation.y += dt * 0.08;
+        grupo.rotation.x = my * 0.3 + Math.sin(now / 5000) * 0.04;
+        grupo.rotation.z = mx * 0.10;
+        camera.position.x = mx * 0.6;
+        camera.lookAt(0, 0, 0);
+        renderer.render(scene, camera);
+        raf = requestAnimationFrame(frame);
+      }
+      function start() { if (!raf) { t0 = performance.now(); raf = requestAnimationFrame(frame); } }
+      function stop() { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
+
+      renderer.render(scene, camera);
+      if (reduce) {
+        grupo.rotation.set(-0.1, 0.5, 0.04);
+        renderer.render(scene, camera);
+        return;
+      }
+      start();
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) stop(); else start();
+      });
+    })();
+  </script>
 </body>
 </html>
