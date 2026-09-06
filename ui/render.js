@@ -8,7 +8,6 @@ let cbCta = null;
 export function alPulsarCta(cb) { cbCta = cb; }
 let cbComboDesglose = null;
 export function alCambiarComboDesglose(cb) { cbComboDesglose = cb; }
-let avisosAbiertos = false;
 
 /** Construye una sola vez el esqueleto persistente (el nodo del precio no se recrea nunca). */
 export function montarResultado() {
@@ -24,6 +23,7 @@ export function montarResultado() {
       <p class="hero-confianza"></p>
       <button type="button" class="hero-cta" hidden></button>
     </article>
+    <section class="avisos-bloque" id="bloque-avisos" hidden></section>
     <section class="por-que">
       <h3>¿Por qué este precio?</h3>
       <p class="por-que-txt"></p>
@@ -92,6 +92,9 @@ export function pintarHero(h) {
 
   $('bloque-hero').querySelector('.por-que-txt').textContent = h.porQue;
 
+  // Sin precio no hay desglose que ver: se oculta el enlace del bloque "¿Por qué?".
+  $('bloque-hero').querySelector('.ver-desglose').hidden = !h.muestraPrecio;
+
   const pisoCuerpo = $('acc-piso').querySelector('.acc-cuerpo');
   pisoCuerpo.innerHTML = h.precioMinimoOperativo
     ? `<p class="nota"><strong>${esc(h.precioMinimoOperativo)}</strong> — cubre logística y el colchón de devoluciones, sin utilidad ni publicidad. Es tu piso: nunca ofrezcas un descuento por debajo de esta línea.</p>`
@@ -151,7 +154,30 @@ function pintarProyeccion(v) {
     </div>`;
 }
 
-export function pintarSecundario(vista) {
+/** Bloque de avisos obligatorio (§A.4.1): lista los avisos de error/aviso del motor. */
+export function pintarAvisos(vista) {
+  const cont = $('bloque-avisos');
+  if (!cont) return;
+  const items = (vista.avisos || []).filter((a) => a.nivel === 'error' || a.nivel === 'aviso');
+  if (items.length === 0) {
+    cont.hidden = true;
+    cont.innerHTML = '';
+    return;
+  }
+  cont.innerHTML = `<ul>${items.map((a) => `<li class="av-${esc(a.nivel)}">${esc(a.mensaje)}</li>`).join('')}</ul>`;
+  cont.hidden = false;
+}
+
+export function pintarSecundario(vista, muestraPrecio = true) {
+  pintarAvisos(vista);
+  if (muestraPrecio === false) {
+    // Estados bloqueados (§B.9): nunca un $0 ni un precio ≈ costo disfrazado de dato.
+    $('acc-desglose').querySelector('.acc-cuerpo').innerHTML = '<p class="nota">El desglose aparece cuando hay un precio recomendado.</p>';
+    $('acc-combos').querySelector('.acc-cuerpo').innerHTML = '<p class="nota">Los combos aparecen cuando hay un precio recomendado.</p>';
+    $('acc-equilibrio').querySelector('.acc-cuerpo').innerHTML = '<p class="nota">Tus límites aparecen cuando hay un precio recomendado.</p>';
+    $('acc-proyeccion').querySelector('.acc-cuerpo').innerHTML = '<p class="nota">La proyección aparece cuando hay un precio recomendado.</p>';
+    return;
+  }
   pintarDesglose(vista);
   pintarCombos(vista);
   pintarEquilibrio(vista);

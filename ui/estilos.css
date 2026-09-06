@@ -74,6 +74,13 @@ h1,h2,h3,h4{font-family:var(--display);margin:0;text-wrap:balance}
 .por-que-txt{margin-top:8px;font-size:14px;line-height:1.6;color:var(--tinta-suave)}
 .ver-desglose{margin-top:10px;font:inherit;font-size:13px;font-weight:600;color:var(--acento);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 
+/* bloque de avisos obligatorio (§A.4.1) */
+.avisos-bloque{margin-top:16px;background:var(--superficie);border:1px solid var(--borde);border-left:4px solid var(--supuesto);border-radius:12px;padding:12px 16px}
+.avisos-bloque ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.avisos-bloque li{font-size:13.5px;line-height:1.5;color:var(--tinta-suave)}
+.avisos-bloque li.av-error{color:var(--falta);font-weight:600}
+.avisos-bloque li.av-aviso{color:var(--supuesto)}
+
 /* acordeones del secundario */
 #bloque-secundario{margin-top:20px;display:flex;flex-direction:column;gap:10px}
 .acc{background:var(--superficie);border:1px solid var(--borde-suave);border-radius:14px;overflow:hidden}

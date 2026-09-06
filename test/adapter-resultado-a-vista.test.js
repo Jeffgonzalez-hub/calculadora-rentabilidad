@@ -63,3 +63,18 @@ test('avisos: el degradante FALTANTE del perfil llega a la vista', () => {
   const v = vistaDe(FORM); // perfil default: comisionRecaudoPct etc. FALTANTE
   assert.ok(v.avisos.some((a) => a.codigo === 'datos_faltantes_en_cero'));
 });
+
+test('C4: estados bloqueados no exponen un número fabricado (sin_costo / no_calculable)', () => {
+  const sinCosto = analizarDesdeFormulario(formDefecto({ costoUnitario: '' }), PERFIL_DEFECTO).hero;
+  assert.equal(sinCosto.estado, 'sin_costo');
+  assert.equal(sinCosto.muestraPrecio, false);
+  assert.equal(sinCosto.precio, null);
+  assert.equal(sinCosto.precioMinimoOperativo, null);
+
+  const perfilSinFlete = { ...structuredClone(PERFIL_DEFECTO), fleteIda: { valor: null, estado: 'FALTANTE' } };
+  const noCalc = analizarDesdeFormulario(formDefecto({ costoUnitario: '24000' }), perfilSinFlete).hero;
+  assert.equal(noCalc.estado, 'no_calculable');
+  assert.equal(noCalc.muestraPrecio, false);
+  assert.equal(noCalc.precio, null);
+  assert.equal(noCalc.precioMinimoOperativo, null);
+});

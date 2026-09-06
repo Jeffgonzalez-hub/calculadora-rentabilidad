@@ -22,7 +22,8 @@ let escSucio = true;
 const perfilPantalla = montarPerfilPantalla($('perfil-pantalla'), {
   alCambiarCampo: (clave, campo) => {
     perfil = { ...perfil, [clave]: campo };
-    perfilPantalla.pintar(perfilToVista(perfil));
+    // Solo el resumen: repintar las filas destruiría el <input> en uso (foco perdido).
+    perfilPantalla.pintarResumen(perfilToVista(perfil));
     recalcularDebounced();
   },
   alGuardar: () => { guardarPerfil(perfil); perfilPantalla.cerrar(); },
@@ -47,7 +48,7 @@ function recalcular() {
   const form = entrada.leerForm();
   const { vista, hero } = analizarDesdeFormulario(form, perfil, comboDesglose);
   pintarHero(hero);
-  pintarSecundario(vista);
+  pintarSecundario(vista, hero.muestraPrecio);
   escSucio = true;
   if (escVisible) recalcularEscenariosDebounced();
 }

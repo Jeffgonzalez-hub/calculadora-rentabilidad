@@ -43,7 +43,7 @@ test('§A.11 sin CAC (cc=0): P_crudo=81904.76, precio=$82.100, margenOperativo=2
   const K0_1 = 24000 + 20000 + (0.25 / 0.75) * (20000 + 20000);
   const margenOperativoEnCrudo = (r.recomendacion.precioCrudo * (1 - 0.05) - K0_1) / r.recomendacion.precioCrudo;
   assert.ok(cerca(margenOperativoEnCrudo, 0.25, 1e-9));
-  assert.match(r.recomendacion.estado, /^estimacion_bruto|ok_bruto$/);
+  assert.match(r.recomendacion.estado, /^(estimacion_bruto|ok_bruto)$/);
 });
 
 test('§A.11 combos n=2,3: la identidad de margen se cumple EN EL CRUDO; el redondeo solo sube el margen realizado, nunca lo baja', () => {

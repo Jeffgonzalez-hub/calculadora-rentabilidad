@@ -4,7 +4,7 @@
  * form (vista básica) <-> entrada del motor, y Resultado <-> vista.
  * CERO fórmulas de negocio: formatea y remapea; los números salen del motor.
  */
-import { analizar, DEFAULTS } from '../src/index.js';
+import { analizar } from '../src/index.js';
 import { perfilAEntrada, contarConfianza, PERFIL_DEFECTO, PRIORIDADES, ETIQUETAS } from './perfil.js';
 import { pesos, pesosCompacto, pct, ratio, oGuion, numero } from './formato.js';
 
@@ -53,7 +53,7 @@ export function perfilToVista(perfil) {
   const fmt = (clave, valor) => {
     if (valor == null) return '';
     if (clave === 'tasaEntrega' || clave === 'tasaCierre' || clave === 'pctProductoPerdidoEnDevolucion' || clave === 'comisionRecaudoPct') {
-      return pct(valor, valor * 100 % 1 === 0 ? 0 : 1);
+      return pct(valor, Number.isInteger(valor * 100) ? 0 : 1);
     }
     if (clave === 'diasOperacionMes') return numero(valor, 0);
     return pesos(valor);
@@ -105,7 +105,7 @@ function lineaConfianza(rec) {
   const f = rec.confianza.faltantesAsumidosCero.length;
   const partes = [];
   if (s > 0) partes.push(`${s} supuesto${s === 1 ? '' : 's'} usado${s === 1 ? '' : 's'}`);
-  if (f > 0) partes.push(`${f} dato${f === 1 ? '' : 's'} faltante${f === 1 ? '' : 's'} — no asumido${f === 1 ? '' : 's'} en $0, se avisan abajo`);
+  if (f > 0) partes.push(`${f} dato${f === 1 ? '' : 's'} faltante${f === 1 ? '' : 's'} asumido${f === 1 ? '' : 's'} en $0 — este precio es un piso`);
   if (!rec.confianza.cacDisponible) partes.unshift('falta el costo por conversación (CAC): precio en modo operativo, no neto');
   return partes.join(' · ');
 }
@@ -130,6 +130,7 @@ function ctaDe(rec) {
     case 'no_calculable': return { texto: `Completá ${rec.parametroFaltante === 'fleteIda' ? 'el flete de ida' : rec.parametroFaltante} en el Perfil económico`, destino: 'perfil', clave: rec.parametroFaltante };
     case 'no_alcanzable': return { texto: 'Ajustá el margen o la comisión', destino: 'margen' };
     case 'ok_neto': return null;
+    case 'ok_bruto': return { texto: 'Cargar CAC', destino: 'perfil' };
     default: return { texto: 'Mejorar precisión', destino: 'perfil' };
   }
 }
@@ -149,7 +150,9 @@ export function recomendacionToVista(resultado) {
     sin_costo: 'Escribí el costo del proveedor',
     sin_objetivo: 'Elegí el margen que querés ganar',
     no_calculable: `Falta ${rec.parametroFaltante === 'fleteIda' ? 'el flete de ida' : rec.parametroFaltante} para calcular`,
-    no_alcanzable: `Un margen del ${Math.round((rec.margenObjetivo ?? 0) * 100)}% no es posible con esta comisión de recaudo`,
+    // rec.margenObjetivo es null en vacia(); el motor ya trae el texto correcto (§A.7/§B.7).
+    no_alcanzable: (rec.avisos ?? []).find((a) => a.codigo === 'no_alcanzable')?.mensaje
+      ?? 'Ese margen no es posible con esta comisión de recaudo',
   };
 
   const lineaMargen = muestraPrecio
@@ -174,7 +177,11 @@ export function recomendacionToVista(resultado) {
     confianza: muestraPrecio ? lineaConfianza(rec) : '',
     porQue: porQueDe(rec),
     cta: ctaDe(rec),
-    precioMinimoOperativo: pmo1 == null ? null : pesos(pmo1),
+    // sin_costo / no_calculable: falta C o Fᵢ, así que el "piso" no significa nada -> null.
+    // no_alcanzable / sin_objetivo sí lo conservan (C y Fᵢ están; §B.7 lo usa como escape).
+    precioMinimoOperativo: (rec.estado === 'sin_costo' || rec.estado === 'no_calculable' || pmo1 == null)
+      ? null
+      : pesos(pmo1),
   };
 }
 
@@ -308,10 +315,12 @@ function vistaEquilibrio(r) {
 
 function vistaProyeccion(r) {
   const p = r.proyeccion;
-  if (p.utilidadMes == null) {
+  // Sin presupuesto de pauta: pedidosDia sale 0 y utilidadDia sale -0 (número, no
+  // null), así que no basta con mirar utilidadMes. Sin pedidos no hay proyección.
+  if (p.utilidadMes == null || !(p.pedidosDia > 0)) {
     return {
       disponible: false,
-      nota: 'Cargá presupuesto de pauta y costo por conversación para proyectar.',
+      nota: 'Cargá un presupuesto de pauta en el perfil para proyectar.',
       pedidosDia: '—', ventasEntregadasDia: '—', utilidadDia: '—', utilidadMes: '—',
     };
   }

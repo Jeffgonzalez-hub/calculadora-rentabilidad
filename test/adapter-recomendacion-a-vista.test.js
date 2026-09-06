@@ -48,7 +48,8 @@ test('estimacion_neto: precio dominante, chips NETO + ESTIMADO, acento ámbar, C
   assert.equal(v.acento, 'ambar');
   assert.match(v.lineaMargen, /25/);
   assert.match(v.confianza, /supuesto/i);
-  assert.match(v.confianza, /no asumid/i);          // §B: "no asumidos en $0"
+  assert.match(v.confianza, /asumidos? en \$0/i);   // §B (C3): "asumidos en $0 — este precio es un piso"
+  assert.match(v.confianza, /piso/i);
   assert.equal(v.cta.destino, 'perfil');
 });
 

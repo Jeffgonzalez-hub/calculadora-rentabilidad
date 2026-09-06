@@ -5,6 +5,7 @@
  */
 
 const CLAVE_STORAGE = 'calc-rentabilidad-perfil-v2';
+const ESTADOS_PERFIL = new Set(['REAL', 'SUPUESTO', 'FALTANTE']);
 
 // Defaults de docs/diseno-v2.md §A.2 (tabla de parámetros).
 export const PERFIL_DEFECTO = Object.freeze({
@@ -74,7 +75,8 @@ export function cargarPerfil() {
     const out = clonDefecto();
     for (const k of Object.keys(out)) {
       const g = guardado?.[k];
-      if (g && (typeof g.valor === 'number' || g.valor === null) && typeof g.estado === 'string') {
+      // estado inválido/desconocido -> se descarta la entrada y queda el default de esa clave.
+      if (g && (typeof g.valor === 'number' || g.valor === null) && ESTADOS_PERFIL.has(g.estado)) {
         out[k] = { valor: g.valor, estado: g.estado };
       }
     }
